@@ -1,0 +1,89 @@
+- !<AssetImportMetadata/4c27eda3-42dc-4102-8faf-9ceba1f67947>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> a1a63c82-8958-42ee-9c0f-a4a6aea2f20f
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> a1a63c82-8958-42ee-9c0f-a4a6aea2f20f
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 124e6622-e22b-4eb5-bb2a-e3917204ce46
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/124e6622-e22b-4eb5-bb2a-e3917204ce46>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: f8a3267c-7278-4cfe-a16e-b11ffb7d3cf3
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    activityButtonA: false
+    activityButtonB: false
+    activityNameA: false
+    activityNameB: false
+    clearActivitiesButton: false
+    defaultOccasion: false
+    defaultWeatherContext: false
+    destinationButtonA: false
+    destinationButtonB: false
+    destinationButtonC: false
+    destinationNameA: false
+    destinationNameB: false
+    destinationNameC: false
+    destinationVisualizer: false
+    enablePortholeOnDestinationSelect: false
+    summaryText: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - summaryText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      destinationButtonA: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      destinationButtonB: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      destinationButtonC: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      destinationNameA: Paris
+      destinationNameB: Tokyo
+      destinationNameC: New York
+      activityButtonA: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      activityButtonB: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      activityNameA: Museums
+      activityNameB: Local food
+      clearActivitiesButton: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      destinationVisualizer: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      enablePortholeOnDestinationSelect: true
+      defaultOccasion: general
+      defaultWeatherContext: clear skies
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Component.Text summaryText {"hint":"Large Text showing the live itinerary"}'
+    - '// @input SceneObject destinationButtonA {"hint":"Three pinch/interactable objects for cities"}'
+    - // @input SceneObject destinationButtonB
+    - // @input SceneObject destinationButtonC
+    - '// @input string destinationNameA = "Paris"'
+    - '// @input string destinationNameB = "Tokyo"'
+    - '// @input string destinationNameC = "New York"'
+    - // @input SceneObject activityButtonA
+    - // @input SceneObject activityButtonB
+    - '// @input string activityNameA = "Museums"'
+    - '// @input string activityNameB = "Local food"'
+    - '// @input SceneObject clearActivitiesButton {"hint":"Optional: pinch to clear the activity list"}'
+    - '// @input AssignableType destinationVisualizer {"hint":"Phase 16 — generate RSG destination layers when a city is chosen"}'
+    - '// @input bool enablePortholeOnDestinationSelect = true {"hint":"If true, triggers Porthole image gen on destination pinch"}'
+    - '// @input string defaultOccasion = "general" {"hint":"Mood keyword for RSG prompt: romantic | adventure | other"}'
+    - '// @input string defaultWeatherContext = "clear skies" {"hint":"Free-text weather line passed into the image prompt"}'

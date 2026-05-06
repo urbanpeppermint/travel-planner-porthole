@@ -1,0 +1,80 @@
+- !<AssetImportMetadata/5839436e-cad9-4c11-bbd4-8d75e93e8893>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 05781b1f-9394-4d16-8742-9e3355989ad1
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 05781b1f-9394-4d16-8742-9e3355989ad1
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 329a1579-557c-41e8-b83c-2b97cccc5dd1
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/329a1579-557c-41e8-b83c-2b97cccc5dd1>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 27c2eae7-c8f6-44e0-8ee0-9982e2b371f3
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    camera: false
+    fgDepth: false
+    fgParallax: false
+    foregroundPlane: false
+    midDepth: false
+    midParallax: false
+    midPlane: false
+    parallaxSensitivity: false
+    remoteServiceModule: false
+    skyDepth: false
+    skyParallax: false
+    skyPlane: false
+    vignettePlane: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - remoteServiceModule: !<reference.RemoteServiceModule> 00000000-0000-0000-0000-000000000000
+      skyPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      midPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      foregroundPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      vignettePlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      camera: !<reference.Camera> 00000000-0000-0000-0000-000000000000
+      skyDepth: !<float> -600.000000
+      midDepth: !<float> -300.000000
+      fgDepth: !<float> -150.000000
+      skyParallax: 0.020000
+      midParallax: 0.060000
+      fgParallax: 0.120000
+      parallaxSensitivity: !<float> 100.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Asset.RemoteServiceModule remoteServiceModule {"hint":"Remote Service Module asset with generate_image endpoint"}'
+    - // @input SceneObject skyPlane
+    - // @input SceneObject midPlane
+    - // @input SceneObject foregroundPlane
+    - // @input SceneObject vignettePlane
+    - '// @input Component.Camera camera {"hint":"Defaults to first root Camera (usually Camera Object) if unset"}'
+    - '// @input float skyDepth = -600 {"hint":"Sky layer local Z in cm (negative = forward in typical Spectacles UI)"}'
+    - // @input float midDepth = -300
+    - // @input float fgDepth = -150
+    - // @input float skyParallax = 0.02
+    - // @input float midParallax = 0.06
+    - // @input float fgParallax = 0.12
+    - '// @input float parallaxSensitivity = 100 {"hint":"Multiplies yaw/pitch parallax offset"}'
