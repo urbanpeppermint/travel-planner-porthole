@@ -11877,7 +11877,7 @@
   Enabled: true
   ScriptAsset: !<reference> cadeca01-0001-4001-8001-000000000001
   ScriptInputsDefault:
-    packScanHud: true
+    {}
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -15733,9 +15733,7 @@
   Enabled: true
   ScriptAsset: !<reference> d8f2d85b-8bfa-4f2d-9bf2-e8c724b25f94
   ScriptInputsDefault:
-    keyboardEntryText: true
-    keyboardPromptText: true
-    keyboardModeRoot: true
+    {}
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -15772,36 +15770,6 @@
   ScriptTypes:
     "":
       {}
-- !<ScriptComponent/f0e1d007-0001-4001-8001-000000000010>
-  PrefabRemaps:
-    []
-  Name: PackScanController
-  Enabled: true
-  ScriptAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
-  ScriptInputsDefault:
-    geminiAssistant: true
-    scanButton: true
-    packScanHud: true
-    packHudText: true
-    detailBodyText: true
-    observedItemsText: true
-    geminiModel: true
-    verboseLogs: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      geminiAssistant: !<MappingBased.AssignableType> f0e1d005-0001-4001-8001-000000000001
-      scanButton: !<MappingBased.AssignableType_1> 83c9d980-bf8f-4bdc-9eb5-98f4ebda54a3
-      packScanHud: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
-      packHudText: !<reference.Text> f0e1b003-0001-4001-8001-000000000094
-      detailBodyText: !<reference.Text> f0e1b003-0001-4001-8001-000000000093
-      observedItemsText: !<reference.Text> f0e1b003-0001-4001-8001-000000000045
-      geminiModel: gemini-2.0-flash
-      verboseLogs: true
-  ScriptTypes:
-    "":
-      {}
 - !<ScriptComponent/f0e1d006-0001-4001-8001-000000000071>
   PrefabRemaps:
     []
@@ -15821,6 +15789,30 @@
       defaultLatitude: !<string> 52.5200
       defaultLongitude: !<string> 13.4050
       fetchOnStart: true
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/f0e1d007-0001-4001-8001-000000000010>
+  PrefabRemaps:
+    []
+  Name: PackScanController
+  Enabled: true
+  ScriptAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
+  ScriptInputsDefault:
+    geminiModel: true
+    verboseLogs: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      geminiAssistant: !<MappingBased.AssignableType> f0e1d005-0001-4001-8001-000000000001
+      scanButton: !<MappingBased.AssignableType_1> 83c9d980-bf8f-4bdc-9eb5-98f4ebda54a3
+      packScanHud: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
+      packHudText: !<reference.Text> f0e1b003-0001-4001-8001-000000000094
+      detailBodyText: !<reference.Text> f0e1b003-0001-4001-8001-000000000093
+      observedItemsText: !<reference.Text> f0e1b003-0001-4001-8001-000000000045
+      geminiModel: gemini-2.0-flash
+      verboseLogs: true
   ScriptTypes:
     "":
       {}
