@@ -1,8 +1,10 @@
 import { DestinationVisualizer } from './DestinationVisualizer'
+import { GeminiAssistant } from './GeminiAssistant'
+import { TripPurpose } from './TripTypes'
 
 /**
- * Orchestration hook for assistant flows (Gemini tools, anti-tracking WebView, Porthole).
- * Wire your session / engine references when those modules exist; Porthole hooks are ready below.
+ * Orchestration hook for assistant flows (e.g. voice session tools, WebView lifecycle, destination imagery).
+ * Wire Gemini / search modules when Remote Service Gateway and related assets are in the project.
  */
 @component
 export class NewInCityAssistant extends BaseScriptComponent {
@@ -10,19 +12,28 @@ export class NewInCityAssistant extends BaseScriptComponent {
   @allowUndefined
   destinationVisualizer: DestinationVisualizer
 
-  /** Latest confirmed trip — extend when you add WebView or LLM tool state */
+  @input
+  @allowUndefined
+  geminiAssistant: GeminiAssistant
+
   private tripData = {
     destination: '',
-    occasion: 'general',
+    occasion: 'leisure' as TripPurpose,
   }
 
   /**
    * Call after the user confirms a trip (e.g. from a `saveTripDetails` tool handler).
-   * Mirrors the Phase 16 integration snippet from your spec.
    */
   saveTripDetails(destination: string, occasion: string, weatherCtx: string): void {
     this.tripData.destination = destination
-    this.tripData.occasion = occasion
+    this.tripData.occasion = this.normalizePurpose(occasion)
+
+    if (this.geminiAssistant) {
+      const draft = this.geminiAssistant.getTripDraft()
+      draft.destinationCity = destination
+      draft.purpose = this.normalizePurpose(occasion)
+      draft.skipLongDistanceTransport = false
+    }
 
     const viz = this.destinationVisualizer
     if (!viz) {
@@ -36,8 +47,51 @@ export class NewInCityAssistant extends BaseScriptComponent {
     })
   }
 
-  /** Call from a `closeWebView` (or similar) tool handler alongside anti-tracking cleanup. */
-  dismissPorthole(): void {
+  private normalizePurpose(raw: string): TripPurpose {
+    const key = (raw || '').toLowerCase()
+    if (key.indexOf('bleisure') >= 0) {
+      return 'bleisure'
+    }
+    if (key.indexOf('business') >= 0) {
+      return 'business'
+    }
+    return 'leisure'
+  }
+
+  /** Call when tearing down WebView / clearing browser state. */
+  dismissDestinationView(): void {
     this.destinationVisualizer?.dismiss()
+  }
+
+  /**
+   * Start voice-first onboarding.
+   * Pass user display name and detected city from your location service module.
+   */
+  beginVoiceAssistant(userName: string, currentCity: string): string {
+    if (!this.geminiAssistant) {
+      return ''
+    }
+    return this.geminiAssistant.beginAssistantSession(userName, currentCity)
+  }
+
+  beginVoiceAssistantFromContext(): string {
+    if (!this.geminiAssistant) {
+      return ''
+    }
+    return this.geminiAssistant.beginAssistantSessionFromContext()
+  }
+
+  /**
+   * Feed speech-to-text transcript from Gemini Live / dictation pipeline.
+   */
+  handleVoiceTranscript(transcript: string): void {
+    this.geminiAssistant?.handleSpeechTranscript(transcript)
+  }
+
+  /**
+   * Trigger Gemini trip planning request once required fields are captured.
+   */
+  planTripFromCapturedDetails(): void {
+    this.geminiAssistant?.requestTripPlan()
   }
 }

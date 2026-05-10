@@ -1,0 +1,65 @@
+- !<AssetImportMetadata/f0e1d007-0001-4001-8001-0000000000aa>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> f0e1d007-0001-4001-8001-000000000002
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/f0e1d007-0001-4001-8001-000000000002>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: f0e1d007-0001-4001-8001-000000000003
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    detailBodyText: false
+    geminiAssistant: false
+    geminiModel: false
+    observedItemsText: false
+    packHudText: false
+    packScanHud: false
+    scanButton: false
+    verboseLogs: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      scanButton: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      packScanHud: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      packHudText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      detailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      observedItemsText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      geminiModel: gemini-2.0-flash
+      verboseLogs: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input AssignableType geminiAssistant {"hint":"Trip context source (destination, dates, purpose)."}'
+    - '// @input AssignableType_1 scanButton {"hint":"Pinch button that triggers a pack scan while Pack HUD is visible."}'
+    - '// @input SceneObject packScanHud {"hint":"Pack HUD root. Scan runs only when this HUD is enabled."}'
+    - '// @input Component.Text packHudText {"hint":"Main text inside Pack HUD."}'
+    - '// @input Component.Text detailBodyText {"hint":"Optional category detail text to mirror the scan result."}'
+    - '// @input Component.Text observedItemsText {"hint":"Observed packed items text (typed by user / future OCR bridge)."}'
+    - '// @input string geminiModel = "gemini-2.0-flash" {"hint":"Gemini model for pack-check text generation."}'
+    - '// @input bool verboseLogs = true {"hint":"Enable PackScanController logs."}'

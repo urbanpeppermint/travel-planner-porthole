@@ -30,14 +30,21 @@
     fgDepth: false
     fgParallax: false
     foregroundPlane: false
+    imagenAspectRatio: false
+    imagenModel: false
     midDepth: false
     midParallax: false
     midPlane: false
     parallaxSensitivity: false
-    remoteServiceModule: false
+    promptWeatherPhrase: false
+    sceneCategory: false
     skyDepth: false
     skyParallax: false
     skyPlane: false
+    spatialImageFrame: false
+    swapSpatialWhenReady: false
+    useCategoryPrompt: false
+    useSpatialImageFrame: false
     vignettePlane: false
   ScriptTypesHidden:
     {}
@@ -48,11 +55,15 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - remoteServiceModule: !<reference.RemoteServiceModule> 00000000-0000-0000-0000-000000000000
+    - imagenModel: imagen-3.0-generate-002
+      imagenAspectRatio: "16:9"
       skyPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       midPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       foregroundPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       vignettePlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spatialImageFrame: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      useSpatialImageFrame: false
+      swapSpatialWhenReady: true
       camera: !<reference.Camera> 00000000-0000-0000-0000-000000000000
       skyDepth: !<float> -600.000000
       midDepth: !<float> -300.000000
@@ -61,20 +72,30 @@
       midParallax: 0.060000
       fgParallax: 0.120000
       parallaxSensitivity: !<float> 100.000000
+      useCategoryPrompt: false
+      sceneCategory: overview
+      promptWeatherPhrase: clear
   ScriptTypes:
     -
       {}
   InputLines:
-    - '// @input Asset.RemoteServiceModule remoteServiceModule {"hint":"Remote Service Module asset with generate_image endpoint"}'
+    - '// @input string imagenModel = "imagen-3.0-generate-002" {"hint":"Vertex model id (RSG Imagen proxy)."}'
+    - '// @input string imagenAspectRatio = "16:9" {"hint":"Imagen aspect ratio (e.g. 1:1, 4:3, 16:9)."}'
     - // @input SceneObject skyPlane
     - // @input SceneObject midPlane
     - // @input SceneObject foregroundPlane
     - // @input SceneObject vignettePlane
-    - '// @input Component.Camera camera {"hint":"Defaults to first root Camera (usually Camera Object) if unset"}'
+    - '// @input Component.ScriptComponent spatialImageFrame {"hint":"Assign the Spatial Image template ScriptComponent (SpatialImage.setImage)."}'
+    - // @input bool useSpatialImageFrame
+    - '// @input bool swapSpatialWhenReady = true {"hint":"Ignored for stock SpatialImage (single-arg setImage). Kept for SikSpatialImageFrame swap flag if you swap prefabs."}'
+    - '// @input Component.Camera camera {"hint":"Defaults to first Camera under scene roots if unset"}'
     - '// @input float skyDepth = -600 {"hint":"Sky layer local Z in cm (negative = forward in typical Spectacles UI)"}'
     - // @input float midDepth = -300
     - // @input float fgDepth = -150
     - // @input float skyParallax = 0.02
     - // @input float midParallax = 0.06
     - // @input float fgParallax = 0.12
-    - '// @input float parallaxSensitivity = 100 {"hint":"Multiplies yaw/pitch parallax offset"}'
+    - '// @input float parallaxSensitivity = 100 {"hint":"Multiplies yaw/pitch parallax offset (layered mode only)"}'
+    - '// @input bool useCategoryPrompt {"hint":"Use category templates from DestinationScenePrompts"}'
+    - '// @input string sceneCategory = "overview" {"hint":"overview | stay | routes | food | places | adventure | weather"}'
+    - '// @input string promptWeatherPhrase = "clear" {"hint":"Fills {weather} when sceneCategory is weather"}'

@@ -1,0 +1,56 @@
+- !<AssetImportMetadata/c0a1b2c3-d4e5-f678-9012-345678901ab1>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> c0a1b2c3-d4e5-f678-9012-345678901ab0
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> c0a1b2c3-d4e5-f678-9012-345678901ab0
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> c0a1b2c3-d4e5-f678-9012-345678901ab2
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/c0a1b2c3-d4e5-f678-9012-345678901ab2>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: c0a1b2c3-d4e5-f678-9012-345678901ab3
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    accuWeatherRemoteModule: false
+    defaultLatitude: false
+    defaultLongitude: false
+    fetchOnStart: false
+    weatherSummaryText: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - accuWeatherRemoteModule: !<reference.RemoteServiceModule> 00000000-0000-0000-0000-000000000000
+      weatherSummaryText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      defaultLatitude: !<string> 52.5200
+      defaultLongitude: !<string> 13.4050
+      fetchOnStart: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Asset.RemoteServiceModule accuWeatherRemoteModule {"hint":"Drag Accuweather.remoteServiceModule from Weather - AccuWeather API package."}'
+    - '// @input Component.Text weatherSummaryText {"hint":"Text to update with current + short forecast summary."}'
+    - '// @input string defaultLatitude = "52.5200" {"hint":"Default latitude when no device location (e.g. Berlin)."}'
+    - '// @input string defaultLongitude = "13.4050" {"hint":"Default longitude when no device location."}'
+    - '// @input bool fetchOnStart = true {"hint":"Call AccuWeather on scene start."}'

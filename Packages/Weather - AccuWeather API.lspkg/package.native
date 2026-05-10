@@ -1,0 +1,44 @@
+- !<NativePackageDescriptor/0a929d18-362e-47ef-8f4b-48e5d4eb8df5>
+  PackagePath: ""
+  StudioVersion:
+    major: 5
+    minor: 15
+    patch: 0
+    build: 25101318
+    type: Unset
+    buildFlavor: ""
+    timestamp: 0
+    commit: ""
+  Description: |-
+    The Weather API - AccuWeather asset includes three examples:
+    
+    A Multiple Day Forecast which shows the forecast for 5 days.
+    A Current Condition example which shows the current weather condition
+    A Simple Example which prints the hourly forecast.
+    
+    Learn more here: 
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  UpdateCheckpoint: 76
+  ExportUid: 0eb07529-945e-40a0-b433-b313266dd786
+  ComponentUid: ca0c00ef-b428-4a68-97c3-41afef921b1c
+  PackagePolicy: CanBeUnpackedTransparent
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  Instantiable: !<reference> 00000000-0000-0000-0000-000000000000
+  AssetLibraryDependencyStructure: !<AssetLibraryDependencyStructure>
+    Name: ""
+    AssetId: ""
+    Hash: ""
+    Version:
+      major: 0
+      minor: 0
+      patch: 0
+      build: 0

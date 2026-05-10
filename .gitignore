@@ -1,7 +1,3 @@
-# Local Cursor / agent symlinks (not portable)
-skills/
-skills-lock.json
-
 # Shipped by Lens Studio
 
 # The lines below are automatically generated and updated by Lens Studio.
@@ -20,3 +16,8 @@ Workspaces/**
 *.lock
 
 # Shipped by Lens Studio
+# Local Cursor / agent symlinks (not portable)
+skills/
+skills-lock.json
+.cursor/
+

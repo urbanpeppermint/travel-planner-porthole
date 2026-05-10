@@ -1,0 +1,85 @@
+- !<AssetImportMetadata/213c5960-038d-44b3-b453-2aca23654626>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 38594a08-f0f4-4bb3-a535-5443dbe08062
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 38594a08-f0f4-4bb3-a535-5443dbe08062
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> d736f1d7-fd4d-47fe-8bc2-e76dc1c9a459
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/d736f1d7-fd4d-47fe-8bc2-e76dc1c9a459>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: f9dcb7d8-2dba-4582-be91-1127a33a6e23
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    categoryTitleTexts: false
+    categoryWidgetRoots: false
+    defaultDestinationToCurrentCity: false
+    destinationVisualizer: false
+    fallbackDepartureCity: false
+    geminiModel: false
+    generationLoadingBar: false
+    planningCategories: false
+    preferUserIdInWelcome: false
+    statusText: false
+    summaryText: false
+    verboseTripLogs: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - geminiModel: gemini-2.0-flash
+      destinationVisualizer: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      summaryText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      generationLoadingBar: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      categoryWidgetRoots: !<reference.SceneObject[]>
+        []
+      categoryTitleTexts: !<reference.Text[]>
+        []
+      planningCategories: !<string[]>
+        - transportation
+        - accommodation
+        - places
+        - restaurants
+        - weather
+        - pack
+      fallbackDepartureCity: Berlin
+      defaultDestinationToCurrentCity: true
+      preferUserIdInWelcome: false
+      verboseTripLogs: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input string geminiModel = "gemini-2.0-flash" {"hint":"Gemini model id for generateContent (e.g. gemini-2.0-flash)."}'
+    - '// @input AssignableType destinationVisualizer {"hint":"Optional destination imagery hook."}'
+    - '// @input Component.Text summaryText {"hint":"Optional summary text for assistant state and captured fields."}'
+    - '// @input Component.Text statusText {"hint":"Optional status text for prompts and errors."}'
+    - '// @input SceneObject generationLoadingBar {"hint":"Optional loading image/object shown while plan generation is running."}'
+    - '// @input SceneObject[] categoryWidgetRoots = {} {"hint":"Enable category widgets when plan is ready."}'
+    - '// @input Component.Text[] categoryTitleTexts = {} {"hint":"Optional title labels for each category widget."}'
+    - '// @input string[] planningCategories = {"transportation","accommodation","places","restaurants","weather","pack"} {"hint":"Category order used in UI and Gemini prompt."}'
+    - '// @input string fallbackDepartureCity = "Berlin" {"hint":"Fallback city for location prompt when location services do not provide one."}'
+    - '// @input bool defaultDestinationToCurrentCity = true {"hint":"If destination is missing, default it to current user city for local explore mode."}'
+    - '// @input bool preferUserIdInWelcome {"hint":"When true, use user id (if available) in welcome; otherwise display name."}'
+    - '// @input bool verboseTripLogs = true {"hint":"Prefix [GeminiAssistant] logs for trip-plan / SDK tracing."}'

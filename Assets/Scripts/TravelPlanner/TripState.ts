@@ -3,38 +3,20 @@
  */
 export class TripState {
   destination: string = ''
-  activities: string[] = []
+  /** Trip purpose / vibe from occasion buttons (leisure, business, bleisure). */
+  occasion: string = ''
 
   setDestination(name: string): void {
     this.destination = name
   }
 
-  addActivity(label: string): void {
-    if (!label || label.length === 0) {
-      return
-    }
-    const maxItems = 8
-    if (this.activities.length >= maxItems) {
-      this.activities.shift()
-    }
-    this.activities.push(label)
-  }
-
-  clearActivities(): void {
-    this.activities = []
+  setOccasion(label: string): void {
+    this.occasion = label
   }
 
   toDisplayString(): string {
-    const dest = this.destination.length > 0 ? this.destination : '(pick a destination)'
-    let out = `Destination: ${dest}\n`
-    if (this.activities.length === 0) {
-      out += '\nAdd activities with the side buttons.'
-    } else {
-      out += '\nItinerary:\n'
-      for (let i = 0; i < this.activities.length; i++) {
-        out += `${i + 1}. ${this.activities[i]}\n`
-      }
-    }
-    return out
+    const dest = this.destination.length > 0 ? this.destination : '(set via voice / assistant)'
+    const occ = this.occasion.length > 0 ? this.occasion : '(pick occasion)'
+    return `Occasion: ${occ}\nDestination: ${dest}\n\nUse voice or keyboard intake to add dates and trip details.`
   }
 }

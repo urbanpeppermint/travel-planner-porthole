@@ -1,0 +1,77 @@
+- !<AssetImportMetadata/6dd942ca-9b77-4447-a6ee-ce9fc00c7149>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> d8f2d85b-8bfa-4f2d-9bf2-e8c724b25f94
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> d8f2d85b-8bfa-4f2d-9bf2-e8c724b25f94
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> ca018c5d-8696-440c-baf7-ee8a07b6bf31
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/ca018c5d-8696-440c-baf7-ee8a07b6bf31>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 3bef4e96-059a-4f5b-9f9f-426dca4c95e7
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    asrQueryController: false
+    geminiAssistant: false
+    hintText: false
+    keyboardConfirmButton: false
+    keyboardEntryText: false
+    keyboardModeRoot: false
+    keyboardPromptText: false
+    keyboardToggleButton: false
+    micToggleButton: false
+    planTripButton: false
+    startAssistantButton: false
+    travelPlannerController: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      asrQueryController: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      startAssistantButton: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      micToggleButton: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      planTripButton: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
+      hintText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      travelPlannerController: !<MappingBased.AssignableType_5> 00000000-0000-0000-0000-000000000000
+      keyboardToggleButton: !<MappingBased.AssignableType_6> 00000000-0000-0000-0000-000000000000
+      keyboardConfirmButton: !<MappingBased.AssignableType_7> 00000000-0000-0000-0000-000000000000
+      keyboardEntryText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      keyboardPromptText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      keyboardModeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input AssignableType geminiAssistant {"hint":"Primary trip assistant."}'
+    - '// @input AssignableType_1 asrQueryController {"hint":"Optional ASR controller that emits user speech transcripts."}'
+    - '// @input AssignableType_2 startAssistantButton {"hint":"Optional legacy voice start button."}'
+    - '// @input AssignableType_3 micToggleButton {"hint":"Optional legacy mic button; hide if using keyboard-first flow."}'
+    - '// @input AssignableType_4 planTripButton {"hint":"Button to submit current captured trip draft to Gemini."}'
+    - '// @input Component.Text hintText {"hint":"Optional hint line for setup/debug status."}'
+    - '// @input AssignableType_5 travelPlannerController {"hint":"Mirrors Gemini trip draft into the center itinerary panel (TripState)."}'
+    - '// @input AssignableType_6 keyboardToggleButton {"hint":"Toggle keyboard entry mode (shows prompt + confirms each step)."}'
+    - '// @input AssignableType_7 keyboardConfirmButton {"hint":"Pinch to confirm current keyboard text entry for active step."}'
+    - '// @input Component.Text keyboardEntryText {"hint":"Text field where user-typed value is read from."}'
+    - '// @input Component.Text keyboardPromptText {"hint":"Prompt/status line for keyboard step flow."}'
+    - '// @input SceneObject keyboardModeRoot {"hint":"Optional panel root enabled only in keyboard mode."}'

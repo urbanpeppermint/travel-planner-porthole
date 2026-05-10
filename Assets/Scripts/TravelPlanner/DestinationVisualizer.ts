@@ -1,15 +1,26 @@
 import Event from 'SpectaclesInteractionKit.lspkg/Utils/Event'
+import NativeLogger from 'SpectaclesInteractionKit.lspkg/Utils/NativeLogger'
+import { Imagen } from 'RemoteServiceGateway.lspkg/HostedExternal/Imagen'
+import { GoogleGenAITypes } from 'RemoteServiceGateway.lspkg/HostedExternal/GoogleGenAITypes'
+import { buildCategoryPrompt, parseSceneCategory } from './DestinationScenePrompts'
 
 /**
- * Phase 16 — Porthole: RSG image → layered spatial planes + head parallax.
- * Configure a `generate_image` endpoint on your Remote Service Module (RSG).
- * Use a separate material instance per plane if you add `uvOffset` / `uvScale` to the Image shader.
+ * Destination preview: **RSG Imagen** (`Imagen.generateImage`) → decode texture → either Snap **Spatial Image**
+ * (`setImage(texture)`) or layered Image planes. Matches Remote Service Gateway examples, not raw `performApiRequest`
+ * on Gemini_Sync (that path has no image API spec).
+ *
+ * AccuWeather RSM must never be assigned here — see Snap AccuWeather asset docs:
+ * https://developers.snap.com/lens-studio/features/remote-apis/remote-apis-templates/weather-api#weather-api---accuweather-asset
  */
 @component
 export class DestinationVisualizer extends BaseScriptComponent {
   @input
-  @hint('Remote Service Module asset with generate_image endpoint')
-  remoteServiceModule: RemoteServiceModule
+  @hint('Vertex model id (RSG Imagen proxy).')
+  imagenModel: string = 'imagen-3.0-generate-002'
+
+  @input
+  @hint('Imagen aspect ratio (e.g. 1:1, 4:3, 16:9).')
+  imagenAspectRatio: string = '16:9'
 
   @input
   skyPlane: SceneObject
@@ -26,7 +37,19 @@ export class DestinationVisualizer extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Defaults to first root Camera (usually Camera Object) if unset')
+  @hint('Assign the Spatial Image template ScriptComponent (SpatialImage.setImage).')
+  spatialImageFrame: ScriptComponent
+
+  @input
+  useSpatialImageFrame: boolean = false
+
+  @input
+  @hint('Ignored for stock SpatialImage (single-arg setImage). Kept for SikSpatialImageFrame swap flag if you swap prefabs.')
+  swapSpatialWhenReady: boolean = true
+
+  @input
+  @allowUndefined
+  @hint('Defaults to first Camera under scene roots if unset')
   camera: Camera
 
   @input
@@ -49,12 +72,25 @@ export class DestinationVisualizer extends BaseScriptComponent {
   fgParallax: number = 0.12
 
   @input
-  @hint('Multiplies yaw/pitch parallax offset')
+  @hint('Multiplies yaw/pitch parallax offset (layered mode only)')
   parallaxSensitivity: number = 100
+
+  @input
+  @hint('Use category templates from DestinationScenePrompts')
+  useCategoryPrompt: boolean = false
+
+  @input
+  @hint('overview | stay | routes | food | places | adventure | weather')
+  sceneCategory: string = 'overview'
+
+  @input
+  @hint('Fills {weather} when sceneCategory is weather')
+  promptWeatherPhrase: string = 'clear'
 
   /** Subscribe with `onImageGenerated.add((name) => { ... })` */
   readonly onImageGenerated: Event<string> = new Event<string>()
 
+  private readonly log = new NativeLogger('DestinationVisualizer')
   private isVisible: boolean = false
   private headOriginRotation: quat | null = null
   private readonly planeBaseLocal: vec3[] = [new vec3(0, 0, 0), new vec3(0, 0, 0), new vec3(0, 0, 0)]
@@ -66,6 +102,11 @@ export class DestinationVisualizer extends BaseScriptComponent {
   }
 
   buildImagePrompt(destination: string, occasion: string, weather: string): string {
+    if (this.useCategoryPrompt) {
+      const category = parseSceneCategory(this.sceneCategory)
+      return buildCategoryPrompt(destination, category, weather.length > 0 ? weather : this.promptWeatherPhrase)
+    }
+
     const mood =
       occasion === 'romantic'
         ? 'golden hour, warm light'
@@ -87,53 +128,43 @@ export class DestinationVisualizer extends BaseScriptComponent {
     weatherCtx: string,
     onComplete: (textureBase64: string | null) => void,
   ): void {
-    if (!this.remoteServiceModule) {
-      print('[Porthole] remoteServiceModule not assigned')
-      onComplete(null)
-      return
-    }
-
     const prompt = this.buildImagePrompt(destination, occasion, weatherCtx)
-    const request = RemoteApiRequest.create()
-    request.endpoint = 'generate_image'
-    request.body = JSON.stringify({
-      prompt: prompt,
-      width: 1024,
-      height: 512,
-      steps: 20,
-      guidance_scale: 7.5,
-    })
+    this.log.i(`Imagen.generateImage model=${this.imagenModel} dest=${destination}`)
 
-    print(`[Porthole] Requesting image for: ${destination}`)
+    const request = {
+      model: this.imagenModel,
+      body: {
+        parameters: {
+          sampleCount: 1,
+          addWatermark: false,
+          aspectRatio: this.imagenAspectRatio,
+          enhancePrompt: true,
+          language: 'en',
+          seed: 0,
+        },
+        instances: [{ prompt }],
+      },
+    } as GoogleGenAITypes.Imagen.ImagenRequest
 
-    this.remoteServiceModule.performApiRequest(request, (response: RemoteApiResponse) => {
-      if (response.statusCode !== 1) {
-        print(`[Porthole] Image gen failed, statusCode=${response.statusCode}`)
-        onComplete(null)
-        return
-      }
-
-      try {
-        const data = JSON.parse(response.body) as Record<string, string>
-        const base64 = data.image ?? data.result ?? data.b64 ?? null
-        if (base64 && base64.length > 0) {
-          onComplete(this.stripDataUrlIfPresent(base64))
+    Imagen.generateImage(request)
+      .then((response) => {
+        if (!response.predictions || response.predictions.length === 0) {
+          this.log.e('Imagen response had no predictions')
+          onComplete(null)
           return
         }
-        const url = (data.imageUrl ?? data.url ?? '').trim()
-        if (url.length > 0) {
-          print(
-            '[Porthole] Response contained a URL, not base64. Point RSG to return base64 in JSON, or extend this script with RemoteMediaModule + your fetch flow (see SCENE_SETUP.md).',
-          )
-        } else {
-          print('[Porthole] Response JSON missing image / result / b64 field')
+        const b64 = response.predictions[0].bytesBase64Encoded
+        if (b64 && b64.length > 0) {
+          onComplete(this.stripDataUrlIfPresent(b64))
+          return
         }
+        this.log.e('Imagen prediction missing bytesBase64Encoded')
         onComplete(null)
-      } catch (e) {
-        print(`[Porthole] JSON parse error: ${e}`)
+      })
+      .catch((err) => {
+        this.log.e(`Imagen.generateImage failed: ${err}`)
         onComplete(null)
-      }
-    })
+      })
   }
 
   applyToPlanes(base64Image: string, destination: string): void {
@@ -143,12 +174,33 @@ export class DestinationVisualizer extends BaseScriptComponent {
         this.finishApplyPlanes(texture, destination)
       },
       () => {
-        print('[Porthole] Base64.decodeTextureAsync failed')
+        this.log.e('Base64.decodeTextureAsync failed')
       },
     )
   }
 
   private finishApplyPlanes(texture: Texture, destination: string): void {
+    if (this.useSpatialImageFrame && this.spatialImageFrame) {
+      const framed = this.spatialImageFrame as {
+        setImage?: (a: Texture, b?: boolean) => void
+      }
+      if (typeof framed.setImage === 'function') {
+        this.spatialImageFrame.sceneObject.enabled = true
+        if (framed.setImage.length >= 2) {
+          framed.setImage(texture, this.swapSpatialWhenReady)
+        } else {
+          framed.setImage(texture)
+        }
+        this.disableLayeredPlanes()
+        this.isVisible = false
+        this.headOriginRotation = null
+        this.onImageGenerated.invoke(destination)
+        this.log.i(`Spatial frame setImage: ${destination}`)
+        return
+      }
+      this.log.w('spatialImageFrame has no setImage(); falling back to layered planes')
+    }
+
     this.setPlaneTexture(this.skyPlane, texture, { uvOffsetY: 0.0, uvScaleY: 1.0 })
     this.setPlaneTexture(this.midPlane, texture, { uvOffsetY: 0.2, uvScaleY: 0.6 })
     this.setPlaneTexture(this.foregroundPlane, texture, { uvOffsetY: 0.7, uvScaleY: 0.3 })
@@ -165,11 +217,21 @@ export class DestinationVisualizer extends BaseScriptComponent {
 
     this.isVisible = true
     this.onImageGenerated.invoke(destination)
-    print(`[Porthole] Active view: ${destination}`)
+    this.log.i(`Layered planes active: ${destination}`)
+  }
+
+  private disableLayeredPlanes(): void {
+    const planes = [this.skyPlane, this.midPlane, this.foregroundPlane, this.vignettePlane]
+    for (let i = 0; i < planes.length; i++) {
+      const p = planes[i]
+      if (p) {
+        p.enabled = false
+      }
+    }
   }
 
   updateParallax(): void {
-    if (!this.isVisible) {
+    if (!this.isVisible || (this.useSpatialImageFrame && this.spatialImageFrame)) {
       return
     }
     const cam = this.resolveCamera()
@@ -190,6 +252,9 @@ export class DestinationVisualizer extends BaseScriptComponent {
   }
 
   dismiss(): void {
+    if (this.useSpatialImageFrame && this.spatialImageFrame) {
+      this.spatialImageFrame.sceneObject.enabled = false
+    }
     const planes = [this.skyPlane, this.midPlane, this.foregroundPlane, this.vignettePlane]
     for (let i = 0; i < planes.length; i++) {
       const p = planes[i]
@@ -283,7 +348,7 @@ export class DestinationVisualizer extends BaseScriptComponent {
     }
     const img = plane.getComponent('Component.Image') as Image
     if (!img) {
-      print(`[Porthole] SceneObject "${plane.name}" needs an Image component`)
+      this.log.w(`SceneObject "${plane.name}" needs an Image component`)
       return
     }
     img.mainPass.baseTex = texture

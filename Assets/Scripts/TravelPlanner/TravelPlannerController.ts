@@ -1,11 +1,13 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable'
 import { SIK } from 'SpectaclesInteractionKit.lspkg/SIK'
 import { DestinationVisualizer } from './DestinationVisualizer'
+import { GeminiAssistant } from './GeminiAssistant'
+import { TripDraft } from './TripTypes'
 import { TripState } from './TripState'
 
 /**
- * Wires SIK Interactable buttons to a simple trip model and a summary Text.
- * See SCENE_SETUP.md in the project root for hierarchy and inspector wiring.
+ * Wires SIK Interactable buttons for three trip purposes: leisure / business / bleisure.
+ * City selection and dates are captured by Gemini assistant (voice or keyboard flow).
  */
 @component
 export class TravelPlannerController extends BaseScriptComponent {
@@ -14,54 +16,40 @@ export class TravelPlannerController extends BaseScriptComponent {
   summaryText: Text
 
   @input
-  @hint('Three pinch/interactable objects for cities')
-  destinationButtonA: SceneObject
+  @hint('Three pinch/interactable roots for purpose: leisure, business, bleisure')
+  occasionButtonA: SceneObject
 
   @input
-  destinationButtonB: SceneObject
+  occasionButtonB: SceneObject
 
   @input
-  destinationButtonC: SceneObject
+  occasionButtonC: SceneObject
 
   @input
-  destinationNameA: string = 'Paris'
+  occasionLabelA: string = 'Leisure'
 
   @input
-  destinationNameB: string = 'Tokyo'
+  occasionLabelB: string = 'Business'
 
   @input
-  destinationNameC: string = 'New York'
-
-  @input
-  @allowUndefined
-  activityButtonA: SceneObject
+  occasionLabelC: string = 'Bleisure'
 
   @input
   @allowUndefined
-  activityButtonB: SceneObject
-
-  @input
-  activityNameA: string = 'Museums'
-
-  @input
-  activityNameB: string = 'Local food'
+  @hint('Optional: sync occasion into assistant trip draft')
+  geminiAssistant: GeminiAssistant
 
   @input
   @allowUndefined
-  @hint('Optional: pinch to clear the activity list')
-  clearActivitiesButton: SceneObject
-
-  @input
-  @allowUndefined
-  @hint('Phase 16 — generate RSG destination layers when a city is chosen')
+  @hint('Phase 16 — generate RSG destination layers when destination is set elsewhere')
   destinationVisualizer: DestinationVisualizer
 
   @input
-  @hint('If true, triggers Porthole image gen on destination pinch')
-  enablePortholeOnDestinationSelect: boolean = true
+  @hint('If true, requests a generated destination image when destination text is set on trip state')
+  enableDestinationImageOnSelect: boolean = false
 
   @input
-  @hint('Mood keyword for RSG prompt: romantic | adventure | other')
+  @hint('Mood keyword for RSG prompt when generating from occasion')
   defaultOccasion: string = 'general'
 
   @input
@@ -69,12 +57,42 @@ export class TravelPlannerController extends BaseScriptComponent {
   defaultWeatherContext: string = 'clear skies'
 
   private readonly trip = new TripState()
+  private lastSyncedDestination: string = ''
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
       this.setupInteractables()
-      this.refreshSummary()
+      if (this.geminiAssistant) {
+        this.syncFromTripDraft(this.geminiAssistant.getTripDraft())
+      } else {
+        this.refreshSummary()
+      }
     })
+  }
+
+  /**
+   * Keeps the large itinerary block (`TripState` / `summaryText`) aligned with the voice assistant draft.
+   */
+  syncFromTripDraft(draft: TripDraft): void {
+    if (draft.destinationCity && draft.destinationCity.length > 0) {
+      this.trip.setDestination(draft.destinationCity)
+    }
+    const p = (draft.purpose || 'leisure').toLowerCase()
+    if (p.indexOf('business') >= 0) {
+      this.trip.setOccasion('Business')
+    } else if (p.indexOf('bleisure') >= 0) {
+      this.trip.setOccasion('Bleisure')
+    } else if (p.indexOf('leisure') >= 0) {
+      this.trip.setOccasion('Leisure')
+    } else if (draft.purpose && draft.purpose.length > 0) {
+      this.trip.setOccasion(draft.purpose.charAt(0).toUpperCase() + draft.purpose.slice(1))
+    }
+    this.refreshSummary()
+    const dest = draft.destinationCity
+    if (dest && dest.length > 0 && dest !== this.lastSyncedDestination) {
+      this.lastSyncedDestination = dest
+      this.tryGenerateDestinationImage(dest)
+    }
   }
 
   private setupInteractables(): void {
@@ -83,60 +101,48 @@ export class TravelPlannerController extends BaseScriptComponent {
       return
     }
 
-    this.bindDestination(this.destinationButtonA, this.destinationNameA)
-    this.bindDestination(this.destinationButtonB, this.destinationNameB)
-    this.bindDestination(this.destinationButtonC, this.destinationNameC)
+    this.bindOccasion(this.occasionButtonA, this.occasionLabelA)
+    this.bindOccasion(this.occasionButtonB, this.occasionLabelB)
+    this.bindOccasion(this.occasionButtonC, this.occasionLabelC)
 
-    this.bindActivity(this.activityButtonA, this.activityNameA)
-    this.bindActivity(this.activityButtonB, this.activityNameB)
-
-    if (this.clearActivitiesButton) {
-      this.bindClear(this.clearActivitiesButton)
-    }
   }
 
-  private bindDestination(button: SceneObject, label: string): void {
+  private bindOccasion(button: SceneObject, label: string): void {
     if (!button) {
-      print('[TravelPlannerController] Missing destination button reference')
+      print('[TravelPlannerController] Missing occasion button reference')
       return
     }
-    const interactable = button.getComponent(Interactable.getTypeName()) as Interactable
+    const interactable = this.findInteractable(button)
     if (!interactable) {
-      print(`[TravelPlannerController] Add Interactable to: ${button.name}`)
+      print(
+        `[TravelPlannerController] No Interactable on "${button.name}" or its children (add SIK Interactable / Pinch Button under the placeholder).`,
+      )
       return
     }
     interactable.onInteractorTriggerEnd.add(() => {
-      this.trip.setDestination(label)
-      this.refreshSummary()
-      this.tryOpenPortholeForDestination(label)
+      this.trip.setOccasion(label)
+      this.syncOccasionToAssistant(label)
+      if (this.geminiAssistant) {
+        this.geminiAssistant.notifyTripDraftChanged()
+      } else {
+        this.refreshSummary()
+      }
     })
   }
 
-  private bindActivity(button: SceneObject | undefined, label: string): void {
-    if (!button) {
+  private syncOccasionToAssistant(label: string): void {
+    if (!this.geminiAssistant) {
       return
     }
-    const interactable = button.getComponent(Interactable.getTypeName()) as Interactable
-    if (!interactable) {
-      print(`[TravelPlannerController] Add Interactable to: ${button.name}`)
-      return
+    const draft = this.geminiAssistant.getTripDraft()
+    const key = label.toLowerCase()
+    if (key.indexOf('business') >= 0) {
+      draft.purpose = 'business'
+    } else if (key.indexOf('bleisure') >= 0) {
+      draft.purpose = 'bleisure'
+    } else {
+      draft.purpose = 'leisure'
     }
-    interactable.onInteractorTriggerEnd.add(() => {
-      this.trip.addActivity(label)
-      this.refreshSummary()
-    })
-  }
-
-  private bindClear(button: SceneObject): void {
-    const interactable = button.getComponent(Interactable.getTypeName()) as Interactable
-    if (!interactable) {
-      print(`[TravelPlannerController] Add Interactable to: ${button.name}`)
-      return
-    }
-    interactable.onInteractorTriggerEnd.add(() => {
-      this.trip.clearActivities()
-      this.refreshSummary()
-    })
   }
 
   private refreshSummary(): void {
@@ -146,12 +152,39 @@ export class TravelPlannerController extends BaseScriptComponent {
     this.summaryText.text = this.trip.toDisplayString()
   }
 
-  private tryOpenPortholeForDestination(label: string): void {
-    if (!this.enablePortholeOnDestinationSelect || !this.destinationVisualizer) {
+  /** Interactable is usually on a child (e.g. Pinch Button prefab), not the placeholder root. */
+  private findInteractable(root: SceneObject): Interactable | null {
+    const direct = root.getComponent(Interactable.getTypeName()) as Interactable
+    if (direct) {
+      return direct
+    }
+    const n = root.getChildrenCount()
+    for (let i = 0; i < n; i++) {
+      const nested = this.findInteractable(root.getChild(i))
+      if (nested) {
+        return nested
+      }
+    }
+    return null
+  }
+
+  /** Call from other scripts when voice flow sets a destination city name. */
+  setTripDestinationForPreview(cityName: string): void {
+    if (!cityName || cityName.length === 0) {
+      return
+    }
+    this.trip.setDestination(cityName)
+    this.refreshSummary()
+    this.tryGenerateDestinationImage(cityName)
+  }
+
+  private tryGenerateDestinationImage(label: string): void {
+    if (!this.enableDestinationImageOnSelect || !this.destinationVisualizer) {
       return
     }
     const viz = this.destinationVisualizer
-    viz.generateDestinationImage(label, this.defaultOccasion, this.defaultWeatherContext, (base64) => {
+    const mood = this.trip.occasion.length > 0 ? this.trip.occasion : this.defaultOccasion
+    viz.generateDestinationImage(label, mood, this.defaultWeatherContext, (base64) => {
       if (base64) {
         viz.applyToPlanes(base64, label)
       }

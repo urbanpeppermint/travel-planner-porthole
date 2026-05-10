@@ -1,0 +1,47 @@
+- !<AssetImportMetadata/01a4e9b0-11eb-c3eb-8e4b-340690464bca>
+  ImportedAssetIds:
+    JavaScriptAsset: !<reference> 14094964-6f56-4b7a-864e-4934a11dabc0
+  ImporterName: JavaScriptAssetImporter
+  PrimaryAsset: !<reference> 14094964-6f56-4b7a-864e-4934a11dabc0
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    AssetLibraryId: 7s5iPBHS5uPLmqMP3RHE0p
+  AssetDataMap:
+    JavaScriptAsset: !<own> fc713a57-59d1-45c8-a14e-c5278f1146a2
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ScriptAssetData/fc713a57-59d1-45c8-a14e-c5278f1146a2>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: "This script displays the time, temperature, and a visual representation of the current weather condition."
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 929e0a37-7f6d-2836-5387-4cb5ff88a7e5
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    conditionIcons: false
+    temperature: false
+    time: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - temperature: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      time: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      conditionIcons: !<reference.SceneObject[]>
+        []
+  ScriptTypes:
+    -
+      {}

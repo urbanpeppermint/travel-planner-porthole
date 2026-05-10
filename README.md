@@ -1,5 +1,9 @@
-# Porthole
+# Travel Planner (Lens Studio)
 
-Spectacles (Lens Studio) project: planner UI hooks, **Porthole** layered destination imagery (RSG), and scene placeholders under **`App_Porthole`** in `Assets/Scene.scene`.
+Spectacles-focused Lens Studio 5.15 project: planner UI hooks, remote destination imagery (Remote Service Module), optional layered quads or **Spatial Image** `setImage` integration, and scene placeholders in `Assets/Scene.scene`.
 
-See **`SCENE_SETUP.md`** for Remote Service Module setup, component wiring, and hierarchy notes.
+Wiring and checklist: `Assets/Scripts/TravelPlanner/SCENE_SETUP.md`.
+
+Reference architecture and API notes: `travel-lens-master-spec.md` (rename this file if you prefer; it is documentation only).
+
+`MORESKILLS.md` is a **Cursor skill** for Word `.docx` work — it is not used by Lens Studio at runtime.

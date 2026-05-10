@@ -1,0 +1,57 @@
+- !<AssetImportMetadata/cadeca01-0001-4001-8001-0000000000aa>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> cadeca01-0001-4001-8001-000000000001
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> cadeca01-0001-4001-8001-000000000001
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> cadeca01-0001-4001-8001-000000000002
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/cadeca01-0001-4001-8001-000000000002>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: cadeca01-0001-4001-8001-000000000003
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    categoryRowRoots: false
+    detailBodyText: false
+    geminiAssistant: false
+    packScanHud: false
+    weatherAccuBridge: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      categoryRowRoots: !<reference.SceneObject[]>
+        []
+      detailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      weatherAccuBridge: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      packScanHud: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input AssignableType geminiAssistant
+    - '// @input SceneObject[] categoryRowRoots = {} {"hint":"Six row roots (e.g. CategoryWidgetHolder_*), same order as planning categories."}'
+    - '// @input Component.Text detailBodyText {"hint":"Multi-line beta copy (repurposed PriceWatch_Text in template scene)."}'
+    - '// @input AssignableType_1 weatherAccuBridge {"hint":"Optional: live AccuWeather strip for Weather category detail."}'
+    - '// @input SceneObject packScanHud {"hint":"Optional: show a HUD object when Pack is opened (e.g. camera preview placeholder)."}'

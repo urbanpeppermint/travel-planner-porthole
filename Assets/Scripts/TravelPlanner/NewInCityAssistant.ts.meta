@@ -27,6 +27,7 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     destinationVisualizer: false
+    geminiAssistant: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -37,8 +38,10 @@
     []
   DefaultScriptInputs:
     - destinationVisualizer: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      geminiAssistant: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
   InputLines:
     - // @input AssignableType destinationVisualizer
+    - // @input AssignableType_1 geminiAssistant

@@ -26,21 +26,17 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    activityButtonA: false
-    activityButtonB: false
-    activityNameA: false
-    activityNameB: false
-    clearActivitiesButton: false
     defaultOccasion: false
     defaultWeatherContext: false
-    destinationButtonA: false
-    destinationButtonB: false
-    destinationButtonC: false
-    destinationNameA: false
-    destinationNameB: false
-    destinationNameC: false
     destinationVisualizer: false
-    enablePortholeOnDestinationSelect: false
+    enableDestinationImageOnSelect: false
+    geminiAssistant: false
+    occasionButtonA: false
+    occasionButtonB: false
+    occasionButtonC: false
+    occasionLabelA: false
+    occasionLabelB: false
+    occasionLabelC: false
     summaryText: false
   ScriptTypesHidden:
     {}
@@ -52,19 +48,15 @@
     []
   DefaultScriptInputs:
     - summaryText: !<reference.Text> 00000000-0000-0000-0000-000000000000
-      destinationButtonA: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      destinationButtonB: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      destinationButtonC: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      destinationNameA: Paris
-      destinationNameB: Tokyo
-      destinationNameC: New York
-      activityButtonA: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      activityButtonB: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      activityNameA: Museums
-      activityNameB: Local food
-      clearActivitiesButton: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      destinationVisualizer: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
-      enablePortholeOnDestinationSelect: true
+      occasionButtonA: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      occasionButtonB: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      occasionButtonC: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      occasionLabelA: Leisure
+      occasionLabelB: Business
+      occasionLabelC: Bleisure
+      geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      destinationVisualizer: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      enableDestinationImageOnSelect: false
       defaultOccasion: general
       defaultWeatherContext: clear skies
   ScriptTypes:
@@ -72,18 +64,14 @@
       {}
   InputLines:
     - '// @input Component.Text summaryText {"hint":"Large Text showing the live itinerary"}'
-    - '// @input SceneObject destinationButtonA {"hint":"Three pinch/interactable objects for cities"}'
-    - // @input SceneObject destinationButtonB
-    - // @input SceneObject destinationButtonC
-    - '// @input string destinationNameA = "Paris"'
-    - '// @input string destinationNameB = "Tokyo"'
-    - '// @input string destinationNameC = "New York"'
-    - // @input SceneObject activityButtonA
-    - // @input SceneObject activityButtonB
-    - '// @input string activityNameA = "Museums"'
-    - '// @input string activityNameB = "Local food"'
-    - '// @input SceneObject clearActivitiesButton {"hint":"Optional: pinch to clear the activity list"}'
-    - '// @input AssignableType destinationVisualizer {"hint":"Phase 16 — generate RSG destination layers when a city is chosen"}'
-    - '// @input bool enablePortholeOnDestinationSelect = true {"hint":"If true, triggers Porthole image gen on destination pinch"}'
-    - '// @input string defaultOccasion = "general" {"hint":"Mood keyword for RSG prompt: romantic | adventure | other"}'
+    - '// @input SceneObject occasionButtonA {"hint":"Three pinch/interactable roots for purpose: leisure, business, bleisure"}'
+    - // @input SceneObject occasionButtonB
+    - // @input SceneObject occasionButtonC
+    - '// @input string occasionLabelA = "Leisure"'
+    - '// @input string occasionLabelB = "Business"'
+    - '// @input string occasionLabelC = "Bleisure"'
+    - '// @input AssignableType geminiAssistant {"hint":"Optional: sync occasion into assistant trip draft"}'
+    - '// @input AssignableType_1 destinationVisualizer {"hint":"Phase 16 — generate RSG destination layers when destination is set elsewhere"}'
+    - '// @input bool enableDestinationImageOnSelect {"hint":"If true, requests a generated destination image when destination text is set on trip state"}'
+    - '// @input string defaultOccasion = "general" {"hint":"Mood keyword for RSG prompt when generating from occasion"}'
     - '// @input string defaultWeatherContext = "clear skies" {"hint":"Free-text weather line passed into the image prompt"}'
