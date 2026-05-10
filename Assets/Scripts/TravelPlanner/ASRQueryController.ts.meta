@@ -26,7 +26,7 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    button: false
+    hintEchoText: false
     statusText: false
   ScriptTypesHidden:
     {}
@@ -37,11 +37,11 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - button: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
-      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+    - statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      hintEchoText: !<reference.Text> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
   InputLines:
-    - '// @input AssignableType button {"hint":"Pinch button used to start/stop transcription."}'
     - '// @input Component.Text statusText {"hint":"Optional text field for listening/error status."}'
+    - '// @input Component.Text hintEchoText {"hint":"Optional second line (e.g. VoiceHint) mirrored with listening/errors."}'

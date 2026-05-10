@@ -17,6 +17,51 @@ import { TripDraft, TripPlanResponse, TripPlanningCategory, TripPurpose } from '
  */
 @component
 export class GeminiAssistant extends BaseScriptComponent {
+  /** Month / weekday tokens that must never be treated as city names (ASR often sits "to may 15" next to cities). */
+  private static readonly NON_CITY_TOKENS = new Set<string>([
+    'jan',
+    'january',
+    'feb',
+    'february',
+    'mar',
+    'march',
+    'apr',
+    'april',
+    'may',
+    'jun',
+    'june',
+    'jul',
+    'july',
+    'aug',
+    'august',
+    'sep',
+    'sept',
+    'september',
+    'oct',
+    'october',
+    'nov',
+    'november',
+    'dec',
+    'december',
+    'mon',
+    'monday',
+    'tue',
+    'tues',
+    'tuesday',
+    'wed',
+    'wednesday',
+    'thu',
+    'thur',
+    'thurs',
+    'thursday',
+    'fri',
+    'friday',
+    'sat',
+    'saturday',
+    'sun',
+    'sunday',
+  ])
+
   @input
   @hint('Gemini model id for generateContent (e.g. gemini-2.0-flash).')
   geminiModel: string = 'gemini-2.0-flash'
@@ -77,6 +122,8 @@ export class GeminiAssistant extends BaseScriptComponent {
 
   private tripDraft: TripDraft = this.createEmptyDraft()
   private waitingForDepartureCityConfirmation: boolean = false
+  /** After the first in-context welcome, further Voice pinches only refresh listening hints (no state reset). */
+  private voiceWelcomeCommitted: boolean = false
   private detectedDepartureCity: string = ''
   private currentUserName: string = 'Traveler'
   private userContextResolved: boolean = false
@@ -117,7 +164,21 @@ export class GeminiAssistant extends BaseScriptComponent {
     if (this.detectedDepartureCity.length === 0) {
       this.detectedDepartureCity = this.fallbackDepartureCity
     }
-    return this.beginAssistantSession(this.currentUserName, this.detectedDepartureCity)
+    if (!this.voiceWelcomeCommitted) {
+      this.voiceWelcomeCommitted = true
+      return this.beginAssistantSession(this.currentUserName, this.detectedDepartureCity)
+    }
+    const hint = this.getVoiceListeningHint()
+    this.setStatus(hint)
+    return hint
+  }
+
+  /** Short line for VoiceHint when user re-opens the mic after the welcome pass. */
+  getVoiceListeningHint(): string {
+    if (this.waitingForDepartureCityConfirmation) {
+      return `Reply: are you leaving from ${this.detectedDepartureCity}? (yes / no / or say your city.)`
+    }
+    return this.getNextMissingPrompt()
   }
 
   /**
@@ -141,9 +202,23 @@ export class GeminiAssistant extends BaseScriptComponent {
     }
 
     const normalized = transcript.trim()
+    const lowered = normalized.toLowerCase()
+
     if (this.waitingForDepartureCityConfirmation) {
-      this.handleDepartureConfirmation(normalized)
-      return
+      if (this.isLocalExploreIntent(lowered)) {
+        this.handleDepartureConfirmation(normalized)
+        return
+      }
+      // User answered the welcome with a full sentence (cities + dates in one go) — do not
+      // block on yes/no; parse everything together.
+      if (this.speechSupersedesDepartureWelcome(lowered)) {
+        this.waitingForDepartureCityConfirmation = false
+        this.tripDraft.skipLongDistanceTransport = false
+      } else {
+        this.handleDepartureConfirmation(normalized)
+        this.publishSummary()
+        return
+      }
     }
 
     this.extractTripFields(normalized)
@@ -244,6 +319,7 @@ export class GeminiAssistant extends BaseScriptComponent {
     this.tripDraft = this.createEmptyDraft()
     this.lastTripPlan = null
     this.waitingForDepartureCityConfirmation = false
+    this.voiceWelcomeCommitted = false
     this.disableCategoryWidgets()
     this.publishSummary()
     this.setStatus('Trip draft cleared.')
@@ -257,6 +333,7 @@ export class GeminiAssistant extends BaseScriptComponent {
       arrivalDateTime: '',
       purpose: 'leisure',
       skipLongDistanceTransport: false,
+      voicePreferenceNotes: '',
     }
   }
 
@@ -372,13 +449,20 @@ export class GeminiAssistant extends BaseScriptComponent {
       this.tripDraft.skipLongDistanceTransport = false
       this.tripDraft.departureCity = this.detectedDepartureCity
       this.waitingForDepartureCityConfirmation = false
+      this.extractTripFields(transcript)
       this.publishSummary()
-      this.setStatus('Great. Where are you going, and what are your departure and return dates?')
+      this.setStatus(
+        this.isDraftReady()
+          ? 'Trip details captured. Say "plan my trip" to generate options.'
+          : 'Great. Where are you going, and what are your departure and return dates?',
+      )
       return
     }
     if (this.isNo(lowered)) {
       this.waitingForDepartureCityConfirmation = false
       this.tripDraft.skipLongDistanceTransport = false
+      this.extractTripFields(transcript)
+      this.publishSummary()
       this.setStatus('No problem. Tell me which city you are leaving from, then your destination and dates.')
       return
     }
@@ -387,8 +471,13 @@ export class GeminiAssistant extends BaseScriptComponent {
     if (city.length > 0) {
       this.tripDraft.departureCity = city
       this.waitingForDepartureCityConfirmation = false
+      this.extractTripFields(transcript)
       this.publishSummary()
-      this.setStatus('Perfect. Now share destination city and travel dates.')
+      this.setStatus(
+        this.isDraftReady()
+          ? 'Trip details captured. Say "plan my trip" to generate options.'
+          : this.getNextMissingPrompt(),
+      )
       return
     }
 
@@ -396,7 +485,9 @@ export class GeminiAssistant extends BaseScriptComponent {
   }
 
   private extractTripFields(transcript: string): void {
-    const lowered = transcript.toLowerCase()
+    const loweredRaw = transcript.toLowerCase()
+    this.applyExplicitCurrentLocationPhrases(loweredRaw)
+    const lowered = this.expandHereAliasesInCityPhrases(loweredRaw)
 
     const cityPair = this.extractCityPairFromFreeform(lowered)
     if (cityPair) {
@@ -440,30 +531,261 @@ export class GeminiAssistant extends BaseScriptComponent {
       }
     }
 
+    const relativeRange = this.extractRelativeDateRange(lowered)
+    if (relativeRange) {
+      if (this.tripDraft.departureDateTime.length === 0) {
+        this.tripDraft.departureDateTime = relativeRange.depart
+      }
+      if (this.tripDraft.arrivalDateTime.length === 0) {
+        this.tripDraft.arrivalDateTime = relativeRange.arrive
+      }
+    }
+
     const purpose = this.extractPurpose(lowered)
     if (purpose !== '') {
       this.tripDraft.purpose = purpose
     }
 
+    this.appendTripPreferenceHintsFromSpeech(transcript)
+
+    const depSan = this.sanitizeCityCandidate(this.tripDraft.departureCity)
+    if (!depSan) {
+      this.tripDraft.departureCity = ''
+    } else if (depSan !== this.tripDraft.departureCity) {
+      this.tripDraft.departureCity = depSan
+    }
+    const destSan = this.sanitizeCityCandidate(this.tripDraft.destinationCity)
+    if (!destSan) {
+      this.tripDraft.destinationCity = ''
+    } else if (destSan !== this.tripDraft.destinationCity) {
+      this.tripDraft.destinationCity = destSan
+    }
+
+    const loc = this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
+    if (loc && this.tripDraft.departureCity.toLowerCase() === 'here') {
+      this.tripDraft.departureCity = loc
+    }
+  }
+
+  /** User said "use my current location" etc. — map departure to Lens-detected / fallback city. */
+  private applyExplicitCurrentLocationPhrases(lowered: string): void {
+    const loc = this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
+    if (!loc || loc.length === 0) {
+      return
+    }
+    const useHere =
+      /\b(use my current location|use current location|my current location|this location|where i am|where i'm at|my gps location)\b/.test(
+        lowered,
+      ) ||
+      /\b(from|leaving|depart(?:ing)?|start(?:ing)?)\s+from\s+here\b/.test(lowered) ||
+      /\b(from|leaving)\s+right\s+here\b/.test(lowered)
+    if (useHere) {
+      this.tripDraft.departureCity = loc
+    }
+  }
+
+  /**
+   * ASR often says "from here to Paris" — replace **here** with the resolved city so city regexes work.
+   * Uses lowercase slug words; sanitize / toCityCase later fixes casing.
+   */
+  private expandHereAliasesInCityPhrases(lowered: string): string {
+    const loc = this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
+    if (!loc || loc.length === 0) {
+      return lowered
+    }
+    const slug = loc.toLowerCase().replace(/\s+/g, ' ').trim()
+    if (slug.length === 0) {
+      return lowered
+    }
+    let s = lowered
+    s = s.replace(/\bfrom here to\b/g, `from ${slug} to`)
+    s = s.replace(/\bgoing from here to\b/g, `going from ${slug} to`)
+    s = s.replace(/\btravel(?:ing|ling)? from here to\b/g, `traveling from ${slug} to`)
+    s = s.replace(/\bleaving from here to\b/g, `leaving from ${slug} to`)
+    s = s.replace(/\bfrom here for\b/g, `from ${slug} for`)
+    return s
   }
 
   private extractCityPairFromFreeform(text: string): { from: string; to: string } | null {
-    const cleaned = text.replace(/[!?]/g, '').trim()
-    const match = cleaned.match(
-      /(?:^|\b)(?:i am going|i'm going|go|travel(?:ing)?|trip|from)?\s*([a-z][a-z\s'-]{1,30})\s+to\s+([a-z][a-z\s'-]{1,30})(?:,| on | departing| leaving| returning|$)/,
+    const t = text.replace(/[!?.]/g, ' ').trim().toLowerCase()
+    // Prefer explicit "from <city> to <city>" so we never swallow "from ... to ... from May …" into one city.
+    const trip = t.match(
+      /\bfrom\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})\s+to\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+from\s|\s+for\s|\s+on\b|\s+between\b|\s+depart|\s+return|\s+leaving|\s+arriv|$|[,.]|\s+\d|\s+tomorrow|\s+today|\s+next\s)/,
     )
-    if (!match || match.length < 3) {
+    if (trip && trip.length >= 3) {
+      const from = this.sanitizeCityCandidate(trip[1].trim())
+      const to = this.sanitizeCityCandidate(trip[2].trim())
+      if (from && to && from.toLowerCase() !== to.toLowerCase()) {
+        return { from, to }
+      }
+    }
+
+    const cleaned = t
+    const legacy = cleaned.match(
+      /(?:^|\b)(?:i am going|i'm going|go|travel(?:ing)?|trip)\s+([a-z][a-z\s'-]{1,30})\s+to\s+([a-z][a-z\s'-]{1,30})(?:,| on | departing| leaving| returning|$)/,
+    )
+    if (legacy && legacy.length >= 3) {
+      const fromL = this.sanitizeCityCandidate(legacy[1].trim())
+      const toL = this.sanitizeCityCandidate(legacy[2].trim())
+      if (fromL && toL && fromL.toLowerCase() !== toL.toLowerCase()) {
+        return { from: fromL, to: toL }
+      }
+    }
+
+    const skipLead = new Set<string>([
+      'flying',
+      'flight',
+      'flights',
+      'travel',
+      'traveling',
+      'travelling',
+      'trip',
+      'go',
+      'going',
+      'fly',
+      'get',
+      'heading',
+      'drive',
+      'train',
+      'bus',
+      'back',
+      'way',
+    ])
+    const direct = t.match(
+      /\b([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})\s+to\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+(?:from|for|on|the|starting|leaving|tomorrow|today|next|between|until|return|,|\d|$)|$)/,
+    )
+    if (direct && direct.length >= 3) {
+      const rawLead = direct[1].trim().toLowerCase()
+      if (!skipLead.has(rawLead)) {
+        const fromD = this.sanitizeCityCandidate(direct[1].trim())
+        const toD = this.sanitizeCityCandidate(direct[2].trim())
+        if (fromD && toD && fromD.toLowerCase() !== toD.toLowerCase()) {
+          return { from: fromD, to: toD }
+        }
+      }
+    }
+
+    return null
+  }
+
+  /** True when the user is clearly dictating a trip (not a short yes/no) — skip welcome gate. */
+  private speechSupersedesDepartureWelcome(lowered: string): boolean {
+    const forCities = this.expandHereAliasesInCityPhrases(lowered)
+    if (this.extractCityPairFromFreeform(forCities)) {
+      return true
+    }
+    if (this.extractDateRangeFromFreeform(lowered)) {
+      return true
+    }
+    if (this.extractRelativeDateRange(lowered)) {
+      return true
+    }
+    if (/\bfrom\s+[a-z][a-z'\-]{1,28}\s+to\s+[a-z]/.test(forCities)) {
+      return true
+    }
+    if (/\b(depart|departure|return(?:ing)?|arriv(?:e|ing)?|until)\b/.test(lowered) && /\d/.test(lowered)) {
+      return true
+    }
+    if (/\bfrom here to\b/.test(lowered) || /\b(use my current location|my current location)\b/.test(lowered)) {
+      return true
+    }
+    return false
+  }
+
+  private addCalendarDays(base: Date, days: number): Date {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate())
+    d.setDate(d.getDate() + days)
+    return d
+  }
+
+  private formatTripCalendarDate(d: Date): string {
+    return `${this.pad2(d.getDate())}/${this.pad2(d.getMonth() + 1)}/${d.getFullYear()}`
+  }
+
+  /**
+   * Parses spoken relative windows: "from tomorrow for a week", "today for 5 days", "next week".
+   * Returns dd/mm/yyyy strings for draft fields (same style as extractDateRangeFromFreeform).
+   */
+  private extractRelativeDateRange(lowered: string): { depart: string; arrive: string } | null {
+    let durDays: number | null = null
+    if (/\bfor\s+(?:a|an|one|1)\s+weeks?\b/.test(lowered) || /\b(?:a|one|1)\s+week(?:\s+long|\s+trip|\s+stay)?\b/.test(lowered)) {
+      durDays = 7
+    }
+    if (/\bfor\s+(?:a|an|one)\s+fortnight\b/.test(lowered)) {
+      durDays = 14
+    }
+    const numDays = lowered.match(/\bfor\s+(\d{1,2})\s+days?\b/)
+    if (numDays) {
+      const n = parseInt(numDays[1], 10)
+      if (n >= 1 && n <= 60) {
+        durDays = n
+      }
+    }
+    const wordDays = lowered.match(
+      /\bfor\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fourteen)\s+days?\b/,
+    )
+    if (wordDays) {
+      const map: { [key: string]: number } = {
+        one: 1,
+        two: 2,
+        three: 3,
+        four: 4,
+        five: 5,
+        six: 6,
+        seven: 7,
+        eight: 8,
+        nine: 9,
+        ten: 10,
+        eleven: 11,
+        twelve: 12,
+        fourteen: 14,
+      }
+      const w = wordDays[1]
+      if (map[w] !== undefined) {
+        durDays = map[w]
+      }
+    }
+
+    let startOffset: number | null = null
+    if (/\bday after tomorrow\b/.test(lowered)) {
+      startOffset = 2
+    } else if (/\b(from|starting|depart(?:ing)?|leav(?:e|ing))\s+tomorrow\b/.test(lowered)) {
+      startOffset = 1
+    } else if (/\b(from|starting|depart(?:ing)?|leav(?:e|ing))\s+today\b/.test(lowered)) {
+      startOffset = 0
+    } else if (/\btomorrow\b/.test(lowered) && durDays !== null) {
+      startOffset = 1
+    } else if (/\btoday\b/.test(lowered) && durDays !== null && !/\bfrom\s+tomorrow\b/.test(lowered)) {
+      startOffset = 0
+    } else if (/\bnext\s+week\b/.test(lowered)) {
+      startOffset = 7
+      if (durDays === null) {
+        durDays = 7
+      }
+    } else if (/\b(leav(?:e|ing)|depart(?:ing)?|start(?:ing)?|go(?:ing)?|flying)\s+today\b/.test(lowered)) {
+      startOffset = 0
+      if (durDays === null) {
+        durDays = 1
+      }
+    }
+
+    if (durDays !== null && startOffset === null) {
+      startOffset = 1
+    }
+    if (startOffset !== null && durDays === null) {
+      durDays = 1
+    }
+
+    if (startOffset === null || durDays === null || durDays < 1) {
       return null
     }
-    const from = this.toCityCase(match[1].trim())
-    const to = this.toCityCase(match[2].trim())
-    if (from.length === 0 || to.length === 0) {
-      return null
+
+    const startDate = this.addCalendarDays(new Date(), startOffset)
+    const endDate = this.addCalendarDays(startDate, durDays)
+    return {
+      depart: this.formatTripCalendarDate(startDate),
+      arrive: this.formatTripCalendarDate(endDate),
     }
-    if (from === to) {
-      return null
-    }
-    return { from, to }
   }
 
   private extractDateRangeFromFreeform(text: string): { depart: string; arrive: string } | null {
@@ -525,14 +847,19 @@ export class GeminiAssistant extends BaseScriptComponent {
 
   private publishSummary(): void {
     if (this.summaryText) {
-      this.summaryText.text = [
+      const lines = [
         `From: ${this.tripDraft.departureCity.length > 0 ? this.tripDraft.departureCity : '—'}`,
         `To: ${this.tripDraft.destinationCity.length > 0 ? this.tripDraft.destinationCity : '—'}`,
         `Depart: ${this.tripDraft.departureDateTime.length > 0 ? this.tripDraft.departureDateTime : '—'}`,
         `Arrive: ${this.tripDraft.arrivalDateTime.length > 0 ? this.tripDraft.arrivalDateTime : '—'}`,
         `Purpose: ${this.tripDraft.purpose.length > 0 ? this.tripDraft.purpose : 'leisure'}`,
         `Transport: ${this.tripDraft.skipLongDistanceTransport ? 'local only (no long-haul)' : 'include long-distance'}`,
-      ].join('\n')
+      ]
+      if (this.tripDraft.voicePreferenceNotes && this.tripDraft.voicePreferenceNotes.length > 0) {
+        const n = this.tripDraft.voicePreferenceNotes
+        lines.push(`Voice prefs: ${n.length > 220 ? `${n.substring(0, 217)}…` : n}`)
+      }
+      this.summaryText.text = lines.join('\n')
     }
     this.onTripDraftUpdated.invoke(this.tripDraft)
   }
@@ -563,6 +890,7 @@ export class GeminiAssistant extends BaseScriptComponent {
       'You are a travel planning assistant. Reply with ONE JSON object only (no markdown, no prose).',
       `User display name: ${this.currentUserName}`,
       `Trip draft (fields may be empty strings): ${tripJson}`,
+      'Use voicePreferenceNotes in the JSON for user intent (food, transport bias, family/work, hobbies) when generating options — never invent a different destination than destinationCity.',
       'Purpose must be exactly one of: leisure, business, bleisure.',
       `Include planning cards ONLY for these categories, in this order when possible: ${catList}.`,
       'If skipLongDistanceTransport is true, omit long-haul flights/trains; focus on local transit and day trips.',
@@ -587,10 +915,10 @@ export class GeminiAssistant extends BaseScriptComponent {
       '  }',
       '}',
       'Categories must be chosen from: transportation, accommodation, places, restaurants, weather, pack.',
-      'For accommodation: prefer sourceSite like booking.com, pricePerNight and totalStayPrice when trip dates exist.',
-      'For transportation: airline, outboundSummary/inboundSummary when cities+dates known; else local transit.',
+      'For accommodation: prefer sourceSite like booking.com, pricePerNight and totalStayPrice when trip dates exist. bookingProductUrl / ticketUrl must be plausible public URLs or omitted — do not invent paths like /hotel/may/ or other nonsense tokens.',
+      'For transportation: airline, outboundSummary/inboundSummary when cities+dates known; else local transit. If voicePreferenceNotes mention shortest/cheapest/direct, reflect that in titles and notes (do not fabricate exact fares).',
       'For places: ticketUrl and/or ticketOfficeHint for ticket purchase.',
-      'For restaurants: pricePerPerson, neighborhood, dressCode.',
+      'For restaurants: include at least 3 options when possible: (1) one Michelin-star or clear fine-dining pick, (2) one famous street-food / market stall locals love, note strong TripAdvisor (or similar) reputation, (3) one other authentic local favorite. Put labels like "Michelin-style", "Street food", "Local classic" in title or notes.',
       'For weather: weatherPracticalTips (what to wear / rain / UV) — not raw API codes.',
       'For pack: luggageVisionHint for packing / bag-check guidance.',
       'Provide at least 2 options per included category when reasonable.',
@@ -783,12 +1111,115 @@ export class GeminiAssistant extends BaseScriptComponent {
   }
 
   private extractCityAfterKeyword(text: string, keyword: string): string {
-    const regex = new RegExp(`${keyword}\\s+([a-zA-Z\\s\\-']{2,40})`)
-    const match = text.match(regex)
+    const t = text.toLowerCase()
+    const kw = keyword.toLowerCase()
+
+    if (kw === 'from') {
+      const trip = t.match(
+        /\bfrom\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})\s+to\b/,
+      )
+      if (trip && trip[1]) {
+        return this.sanitizeCityCandidate(trip[1].trim()) || ''
+      }
+      const loose = t.match(/\bfrom\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s*[,.]|$|\s+and\s|\s+on\s|\d)/)
+      if (loose && loose[1]) {
+        return this.sanitizeCityCandidate(loose[1].trim()) || ''
+      }
+      return ''
+    }
+
+    if (kw === 'to') {
+      const trip = t.match(
+        /\bfrom\s+[a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2}\s+to\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+from\s|\s+on\b|[,.]|\s+for\s|\s+the\s|$)/,
+      )
+      if (trip && trip[1]) {
+        return this.sanitizeCityCandidate(trip[1].trim()) || ''
+      }
+      const loose = t.match(/\bto\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+from|\s+on|[,.]|$)/)
+      if (loose && loose[1]) {
+        return this.sanitizeCityCandidate(loose[1].trim()) || ''
+      }
+      return ''
+    }
+
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(`\\b${escaped}\\s+([a-z][a-zA-Z\\-']{1,24})(?=\\s|$|[,.]|\\d)`)
+    const match = t.match(regex)
     if (!match || match.length < 2) {
       return ''
     }
-    return this.toCityCase(match[1].trim())
+    return this.sanitizeCityCandidate(match[1].trim()) || ''
+  }
+
+  /** Drops month/weekday tokens so "Berlin May" → "Berlin"; rejects pure "May" as a city. */
+  private sanitizeCityCandidate(raw: string): string | null {
+    const stripped = raw
+      .trim()
+      .toLowerCase()
+      .replace(/[,.'"]+/g, ' ')
+      .trim()
+    if (!stripped.length) {
+      return null
+    }
+    const words = stripped.split(/\s+/).filter((w) => w.length > 0 && !GeminiAssistant.NON_CITY_TOKENS.has(w))
+    if (words.length === 0) {
+      return null
+    }
+    return this.toCityCase(words.join(' '))
+  }
+
+  private appendTripPreferenceHintsFromSpeech(transcript: string): void {
+    const t = transcript.toLowerCase()
+    const lines: string[] = []
+    const add = (s: string) => {
+      if (lines.indexOf(s) < 0) {
+        lines.push(s)
+      }
+    }
+    if (/\b(for work|business trip|work travel|conference|client meeting)\b/.test(t)) {
+      add('Context: work / business')
+    }
+    if (/\b(family|with (my )?(kids|children)|spouse|parents|relatives)\b/.test(t)) {
+      add('Context: family')
+    }
+    if (/\b(solo|alone|by myself)\b/.test(t)) {
+      add('Context: solo')
+    }
+    if (/\b(michelin|fine dining|tasting menu)\b/.test(t)) {
+      add('Food: upscale / Michelin-style interest')
+    }
+    if (/\b(street food|food market|night market|hawker|food stall)\b/.test(t)) {
+      add('Food: street food & markets')
+    }
+    if (/\b(tripadvisor|yelp|google reviews)\b/.test(t)) {
+      add('Food: cares about review ratings')
+    }
+    if (/\b(vegetarian|vegan|halal|kosher|gluten[- ]?free)\b/.test(t)) {
+      add('Food: dietary requirement mentioned')
+    }
+    if (/\b(shortest route|fewest stops|fastest|quickest)\b/.test(t)) {
+      add('Transport: prefer speed / few connections')
+    }
+    if (/\b(cheapest|budget|save money|affordable|lowest price|best deal)\b/.test(t)) {
+      add('Transport: prefer lowest cost')
+    }
+    if (/\b(direct|non[- ]?stop|fewer layovers)\b/.test(t)) {
+      add('Transport: prefer direct routing')
+    }
+    if (/\b(museum|hiking|nightlife|shopping|architecture|history|art galleries?|photography)\b/.test(t)) {
+      add('Interests: activities mentioned')
+    }
+    const block = lines.join('; ')
+    if (!block.length) {
+      return
+    }
+    const cur = this.tripDraft.voicePreferenceNotes || ''
+    if (cur.indexOf(block) >= 0) {
+      return
+    }
+    const merged = cur.length > 0 ? `${cur} | ${block}` : block
+    this.tripDraft.voicePreferenceNotes =
+      merged.length > 900 ? `${merged.substring(0, 897)}…` : merged
   }
 
   private extractDateTimeAfterKeyword(text: string, keyword: string): string {
@@ -852,11 +1283,22 @@ export class GeminiAssistant extends BaseScriptComponent {
   }
 
   private isYes(text: string): boolean {
-    return text === 'yes' || text.indexOf('yes ') === 0 || text.indexOf('sure') >= 0 || text.indexOf('correct') >= 0
+    const t = text.toLowerCase().trim()
+    if (t === 'yes' || t.indexOf('yes,') === 0 || t.indexOf('yes ') === 0) {
+      return true
+    }
+    return /\b(sure|correct|yeah|yep|yup|absolutely|definitely|ok|okay)\b/.test(t)
   }
 
   private isNo(text: string): boolean {
-    return text === 'no' || text.indexOf('no ') === 0 || text.indexOf('not') >= 0 || text.indexOf('another city') >= 0
+    const t = text.toLowerCase().trim()
+    if (t === 'no' || t.indexOf('no,') === 0 || t.indexOf('no ') === 0) {
+      return true
+    }
+    if (/\b(another city|different city|not from here|wrong city)\b/.test(t)) {
+      return true
+    }
+    return /\bno\b/.test(t) && t.length < 36
   }
 
   private isLocalExploreIntent(text: string): boolean {
@@ -864,9 +1306,12 @@ export class GeminiAssistant extends BaseScriptComponent {
       text.indexOf('already here') >= 0 ||
       text.indexOf('already there') >= 0 ||
       text.indexOf('i am here') >= 0 ||
+      text.indexOf('stay here') >= 0 ||
       text.indexOf('local') >= 0 ||
       text.indexOf('near me') >= 0 ||
-      text.indexOf('current location') >= 0
+      text.indexOf('current location') >= 0 ||
+      /\bexplore\s+here\b/.test(text) ||
+      /\baround\s+here\b/.test(text)
     )
   }
 

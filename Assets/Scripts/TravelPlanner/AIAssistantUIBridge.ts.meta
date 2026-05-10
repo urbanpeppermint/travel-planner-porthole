@@ -27,6 +27,7 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     asrQueryController: false
+    clearInputsButton: false
     geminiAssistant: false
     hintText: false
     keyboardConfirmButton: false
@@ -34,9 +35,10 @@
     keyboardModeRoot: false
     keyboardPromptText: false
     keyboardToggleButton: false
-    micToggleButton: false
+    micMuteToggle: false
     planTripButton: false
     startAssistantButton: false
+    swapVoiceAndKeyboardPinchButtons: false
     travelPlannerController: false
   ScriptTypesHidden:
     {}
@@ -50,7 +52,7 @@
     - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       asrQueryController: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       startAssistantButton: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
-      micToggleButton: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      micMuteToggle: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       planTripButton: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
       hintText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       travelPlannerController: !<MappingBased.AssignableType_5> 00000000-0000-0000-0000-000000000000
@@ -59,19 +61,23 @@
       keyboardEntryText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       keyboardPromptText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       keyboardModeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      swapVoiceAndKeyboardPinchButtons: false
+      clearInputsButton: !<MappingBased.AssignableType_8> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
   InputLines:
     - '// @input AssignableType geminiAssistant {"hint":"Primary trip assistant."}'
     - '// @input AssignableType_1 asrQueryController {"hint":"Optional ASR controller that emits user speech transcripts."}'
-    - '// @input AssignableType_2 startAssistantButton {"hint":"Optional legacy voice start button."}'
-    - '// @input AssignableType_3 micToggleButton {"hint":"Optional legacy mic button; hide if using keyboard-first flow."}'
+    - '// @input AssignableType_2 startAssistantButton {"hint":"Voice capture: assign PinchButton under Btn_VoiceMode_Placeholder. Pinch = welcome (once) + start/stop speech-to-text."}'
+    - '// @input AssignableType_3 micMuteToggle {"hint":"SIK Toggle on Btn_Mic: ON = muted (blocks capture), OFF = unmuted. Does not start STT."}'
     - '// @input AssignableType_4 planTripButton {"hint":"Button to submit current captured trip draft to Gemini."}'
     - '// @input Component.Text hintText {"hint":"Optional hint line for setup/debug status."}'
     - '// @input AssignableType_5 travelPlannerController {"hint":"Mirrors Gemini trip draft into the center itinerary panel (TripState)."}'
-    - '// @input AssignableType_6 keyboardToggleButton {"hint":"Toggle keyboard entry mode (shows prompt + confirms each step)."}'
+    - '// @input AssignableType_6 keyboardToggleButton {"hint":"Keyboard intake: assign PinchButton under Btn_Keyboard_Placeholder. Does not start the mic."}'
     - '// @input AssignableType_7 keyboardConfirmButton {"hint":"Pinch to confirm current keyboard text entry for active step."}'
-    - '// @input Component.Text keyboardEntryText {"hint":"Text field where user-typed value is read from."}'
-    - '// @input Component.Text keyboardPromptText {"hint":"Prompt/status line for keyboard step flow."}'
+    - '// @input Component.Text keyboardEntryText {"hint":"Dedicated line for typed trip fields — assign VoiceListening_Status_Text (not PromptTitle, not VoiceHint)."}'
+    - '// @input Component.Text keyboardPromptText {"hint":"Prompt/status line for keyboard step flow (use PromptSubtitle, not VoiceHint)."}'
     - '// @input SceneObject keyboardModeRoot {"hint":"Optional panel root enabled only in keyboard mode."}'
+    - '// @input bool swapVoiceAndKeyboardPinchButtons {"hint":"Enable if the KEYBOARD row runs voice and Voice row opens keyboard (overlapping prefabs / wrong drag-drop)."}'
+    - '// @input AssignableType_8 clearInputsButton {"hint":"Pinch to clear trip draft, voice prefs, and plan widgets (fixes bad parses). Assign PinchButton on Btn_ClearInputs."}'

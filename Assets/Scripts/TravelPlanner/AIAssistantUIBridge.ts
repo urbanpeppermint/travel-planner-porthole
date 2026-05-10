@@ -1,4 +1,7 @@
+require('LensStudio:TextInputModule')
+
 import { PinchButton } from 'SpectaclesInteractionKit.lspkg/Components/UI/PinchButton/PinchButton'
+import { ToggleButton } from 'SpectaclesInteractionKit.lspkg/Components/UI/ToggleButton/ToggleButton'
 import { ASRQueryController } from './ASRQueryController'
 import { GeminiAssistant } from './GeminiAssistant'
 import { TravelPlannerController } from './TravelPlannerController'
@@ -20,13 +23,13 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Optional legacy voice start button.')
+  @hint('Voice capture: assign PinchButton under Btn_VoiceMode_Placeholder. Pinch = welcome (once) + start/stop speech-to-text.')
   startAssistantButton: PinchButton
 
   @input
   @allowUndefined
-  @hint('Optional legacy mic button; hide if using keyboard-first flow.')
-  micToggleButton: PinchButton
+  @hint('SIK Toggle on Btn_Mic: ON = muted (blocks capture), OFF = unmuted. Does not start STT.')
+  micMuteToggle: ToggleButton
 
   @input
   @allowUndefined
@@ -45,7 +48,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Toggle keyboard entry mode (shows prompt + confirms each step).')
+  @hint('Keyboard intake: assign PinchButton under Btn_Keyboard_Placeholder. Does not start the mic.')
   keyboardToggleButton: PinchButton
 
   @input
@@ -55,12 +58,12 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Text field where user-typed value is read from.')
+  @hint('Dedicated line for typed trip fields — assign VoiceListening_Status_Text (not PromptTitle, not VoiceHint).')
   keyboardEntryText: Text
 
   @input
   @allowUndefined
-  @hint('Prompt/status line for keyboard step flow.')
+  @hint('Prompt/status line for keyboard step flow (use PromptSubtitle, not VoiceHint).')
   keyboardPromptText: Text
 
   @input
@@ -68,14 +71,81 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
   @hint('Optional panel root enabled only in keyboard mode.')
   keyboardModeRoot: SceneObject
 
+  @input
+  @hint('Enable if the KEYBOARD row runs voice and Voice row opens keyboard (overlapping prefabs / wrong drag-drop).')
+  swapVoiceAndKeyboardPinchButtons: boolean = false
+
+  @input
+  @allowUndefined
+  @hint('Pinch to clear trip draft, voice prefs, and plan widgets (fixes bad parses). Assign PinchButton on Btn_ClearInputs.')
+  clearInputsButton: PinchButton
+
   private keyboardModeEnabled: boolean = false
   private keyboardStepIndex: number = 0
   private readonly keyboardSteps = ['departure city', 'destination city', 'departure date', 'arrival date']
+  private keyboardOptions: any = null
+  private textInputPrimed: boolean = false
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
+      this.primeTextInputOptions()
       this.bindUi()
     })
+  }
+
+  private primeTextInputOptions(): void {
+    if (this.textInputPrimed) {
+      return
+    }
+    try {
+      const g = global as any
+      const TIS = g.TextInputSystem
+      if (!TIS || !g.textInputSystem) {
+        print('[AIAssistantUIBridge] textInputSystem unavailable in this host (use Spectacles device for AR keyboard).')
+        return
+      }
+      const opts = new TIS.KeyboardOptions()
+      opts.enablePreview = false
+      opts.keyboardType = TIS.KeyboardType.Text
+      opts.returnKeyType = TIS.ReturnKeyType.Done
+      const self = this
+      opts.onTextChanged = (text: string, _: vec2) => {
+        if (self.keyboardEntryText && self.keyboardModeEnabled) {
+          self.keyboardEntryText.text = text
+        }
+      }
+      opts.onReturnKeyPressed = () => {
+        self.dismissTripKeyboard()
+      }
+      opts.onKeyboardStateChanged = (_open: boolean) => {}
+      this.keyboardOptions = opts
+      this.textInputPrimed = true
+    } catch (e) {
+      print(`[AIAssistantUIBridge] primeTextInputOptions failed: ${e}`)
+    }
+  }
+
+  private requestTripKeyboard(): void {
+    this.primeTextInputOptions()
+    const g = global as any
+    if (!this.keyboardOptions || !g.textInputSystem) {
+      this.setKeyboardPrompt('AR keyboard: build to Spectacles. Editor preview often has no textInputSystem.')
+      return
+    }
+    if (this.keyboardEntryText) {
+      this.keyboardEntryText.text = ''
+    }
+    print('[AIAssistantUIBridge] requestKeyboard for trip field entry')
+    g.textInputSystem.requestKeyboard(this.keyboardOptions)
+  }
+
+  private dismissTripKeyboard(): void {
+    const g = global as any
+    if (g.textInputSystem) {
+      try {
+        g.textInputSystem.dismissKeyboard()
+      } catch (_e) {}
+    }
   }
 
   private bindUi(): void {
@@ -89,24 +159,32 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     })
     this.travelPlannerController?.syncFromTripDraft(this.geminiAssistant.getTripDraft())
 
-    if (this.keyboardToggleButton) {
-      this.keyboardToggleButton.onButtonPinched.add(() => {
+    const voicePinch = this.swapVoiceAndKeyboardPinchButtons ? this.keyboardToggleButton : this.startAssistantButton
+    const keyboardPinch = this.swapVoiceAndKeyboardPinchButtons ? this.startAssistantButton : this.keyboardToggleButton
+
+    if (keyboardPinch) {
+      keyboardPinch.onButtonPinched.add(() => {
         this.enterKeyboardMode()
       })
     }
 
-    if (this.startAssistantButton) {
-      this.startAssistantButton.onButtonPinched.add(() => {
+    if (voicePinch) {
+      voicePinch.onButtonPinched.add(() => {
         if (this.keyboardModeEnabled) {
+          this.dismissTripKeyboard()
           this.keyboardModeEnabled = false
           this.updateKeyboardUi()
           this.setKeyboardPrompt('Voice mode ON. Keyboard flow paused.')
         }
-        const welcome = this.geminiAssistant.beginAssistantSessionFromContext()
-        this.setHint(welcome)
+        const wasRecording = this.asrQueryController?.getIsRecording() ?? false
+        const micMuted = this.asrQueryController?.getMicMuted() ?? false
+        if (!wasRecording && !micMuted) {
+          const line = this.geminiAssistant.beginAssistantSessionFromContext()
+          this.setHint(line)
+        }
+        this.asrQueryController?.toggleRecording()
       })
-    } else if (!this.keyboardToggleButton) {
-      // If only one button exists, let it start voice session (not keyboard mode).
+    } else if (!keyboardPinch) {
       this.setHint('Assign keyboardToggleButton to enable manual text-entry mode.')
     }
 
@@ -122,11 +200,40 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
       })
     }
 
+    if (this.micMuteToggle && this.asrQueryController) {
+      this.micMuteToggle.onStateChanged.add((isToggledOn: boolean) => {
+        const wantMuted = isToggledOn
+        const muted = this.asrQueryController.getMicMuted()
+        if (wantMuted && !muted) {
+          this.asrQueryController.toggleMicMuted()
+        } else if (!wantMuted && muted) {
+          this.asrQueryController.toggleMicMuted()
+        }
+      })
+    }
+
     if (this.keyboardConfirmButton) {
       this.keyboardConfirmButton.onButtonPinched.add(() => {
         this.confirmKeyboardStep()
       })
     }
+
+    if (this.clearInputsButton) {
+      this.clearInputsButton.onButtonPinched.add(() => {
+        this.keyboardModeEnabled = false
+        this.dismissTripKeyboard()
+        if (this.asrQueryController && this.asrQueryController.getIsRecording()) {
+          this.asrQueryController.toggleRecording()
+        }
+        this.geminiAssistant?.resetTripDraft()
+        this.setHint('Inputs cleared. Pinch Voice Mode to start again.')
+        if (this.geminiAssistant && this.travelPlannerController) {
+          this.travelPlannerController.syncFromTripDraft(this.geminiAssistant.getTripDraft())
+        }
+        this.updateKeyboardUi()
+      })
+    }
+
     this.updateKeyboardUi()
   }
 
@@ -137,6 +244,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
     const normalized = query.toLowerCase().trim()
     this.geminiAssistant.handleSpeechTranscript(query)
+    this.setHint(query.trim())
 
     if (
       normalized.indexOf('plan my trip') >= 0 ||
@@ -154,10 +262,16 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
   }
 
   private enterKeyboardMode(): void {
+    if (this.asrQueryController && this.asrQueryController.getIsRecording()) {
+      this.asrQueryController.toggleRecording()
+    }
+    this.setHint('')
+    this.dismissTripKeyboard()
     this.keyboardModeEnabled = true
     this.keyboardStepIndex = 0
     this.setKeyboardPrompt('Keyboard mode ON. Enter departure city, then pinch Confirm.')
     this.updateKeyboardUi()
+    this.requestTripKeyboard()
   }
 
   private updateKeyboardUi(): void {
@@ -182,6 +296,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     const entry = this.keyboardEntryText ? this.keyboardEntryText.text.trim() : ''
     if (entry.length === 0) {
       this.setKeyboardPrompt('Please type a value before confirming.')
+      this.requestTripKeyboard()
       return
     }
     const draft = this.geminiAssistant.getTripDraft()
@@ -192,12 +307,14 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     } else if (this.keyboardStepIndex === 2) {
       if (!this.isDateDdMmYyyy(entry)) {
         this.setKeyboardPrompt(`Use ${AIAssistantUIBridge.DATE_HINT} format for departure date.`)
+        this.requestTripKeyboard()
         return
       }
       draft.departureDateTime = entry
     } else if (this.keyboardStepIndex === 3) {
       if (!this.isDateDdMmYyyy(entry)) {
         this.setKeyboardPrompt(`Use ${AIAssistantUIBridge.DATE_HINT} format for arrival date.`)
+        this.requestTripKeyboard()
         return
       }
       draft.arrivalDateTime = entry
@@ -210,10 +327,12 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     if (this.keyboardStepIndex >= this.keyboardSteps.length) {
       this.setKeyboardPrompt('All keyboard fields captured. Pinch Plan Trip anytime.')
       this.keyboardModeEnabled = false
+      this.dismissTripKeyboard()
       this.updateKeyboardUi()
       return
     }
     this.updateKeyboardUi()
+    this.requestTripKeyboard()
   }
 
   private setKeyboardPrompt(message: string): void {

@@ -174,7 +174,7 @@ export class PackScanController extends BaseScriptComponent {
     if (!this.packScanHud || !this.packScanHud.enabled) {
       return
     }
-    this.setHudText('PACK SCAN HUD\nPinch Confirm Input to run scan.')
+    this.setHudText('PACK SCAN HUD\nPinch Scan Pack to run a text-based check (trip context only).')
   }
 
   private setHudText(message: string): void {

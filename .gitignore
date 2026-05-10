@@ -1,5 +1,10 @@
 # Shipped by Lens Studio
 
+# Cursor / local agent (not part of the Lens project)
+MORESKILLS.md
+**/.cursor/**
+.cursor/
+
 # The lines below are automatically generated and updated by Lens Studio.
 # Please do not modify them manually, as changes will be overwritten each time!
 # If you want to make changes to this file, please put them either above or below this section.
@@ -19,5 +24,4 @@ Workspaces/**
 # Local Cursor / agent symlinks (not portable)
 skills/
 skills-lock.json
-.cursor/
 

@@ -16,17 +16,44 @@ Only these three purpose labels are supported now:
 - `Bleisure`
 
 ### Bottom buttons (recommended wiring)
-- **Start button** → `AIAssistantUIBridge.startAssistantButton` (starts voice assistant session)
+- **Voice Mode pinch** → `AIAssistantUIBridge.startAssistantButton` — runs `beginAssistantSessionFromContext()` **and** `ASRQueryController.toggleRecording()` on every pinch (listen ↔ stop). No PinchButton on `ASRQueryController` anymore (avoids dead refs / double subscriptions).
+- **Mic mute (SIK Toggle on Btn_Mic)** → `AIAssistantUIBridge.micMuteToggle` — toggles mute inside `ASRQueryController` (`toggleMicMuted()`). **ON = muted.** It does **not** start STT; use **Voice Mode** pinch for capture.
 - **Plan Trip button** → `AIAssistantUIBridge.planTripButton`
-- **Mic button** → `ASRQueryController.button`
-- **Keyboard toggle button (optional extra button)** → `AIAssistantUIBridge.keyboardToggleButton`
-- **Keyboard confirm button (optional extra button)** → `AIAssistantUIBridge.keyboardConfirmButton`
+- **Keyboard pinch** → `AIAssistantUIBridge.keyboardToggleButton`
+- **Keyboard confirm pinch** → `AIAssistantUIBridge.keyboardConfirmButton`
+- **Swap pinch handlers** → enable **`swapVoiceAndKeyboardPinchButtons`** on `AIAssistantUIBridge` only if gaze consistently hits the wrong capsule (overlapping colliders); otherwise keep **off** and fix hierarchy / assignments.
+
+### Voice / hint text (scene)
+- **`ASRQueryController.statusText`** → subtitle (`PromptSubtitle_Text` / `…042`) — **Listening…**, errors, and “Heard: …” (does **not** share the same line as keyboard step prompts if you keep prompts on `…042`—then listening overwrites the prompt while the mic is open; that is expected).
+- **`ASRQueryController.hintEchoText`** → **VoiceHint** (`…044`): welcome + **final transcript** only. “Listening…” is **not** copied here so the hint line is not wiped while you read keyboard instructions on the subtitle.
+- **`AIAssistantUIBridge.hintText`** → same VoiceHint line: bridge writes welcome + **last accepted utterance** after `handleSpeechTranscript`.
+- If **Voice** and **KEYBOARD** feel reversed, first re-drag PinchButtons as above; if layout cannot be fixed, enable **`swapVoiceAndKeyboardPinchButtons`** instead of crossing wires in the Inspector.
+- Duplicate legacy **`ASRQueryController`** scene object at project root is **disabled** so only the controller on `Assistant_System` drives transcription.
+
+### AR keyboard for typed trip fields (Spectacles pattern)
+
+Snap’s **Spatial Persistence** sample shows editing note text with **`global.textInputSystem.requestKeyboard(...)`** and a **SIK `ToggleButton`** (not the Voice pinch). Reference project: [Spectacles-Sample / Spatial Persistence](https://github.com/Snapchat/Spectacles-Sample/tree/main/Spatial%20Persistence).
+
+**Step-by-step (Lens Studio)**
+
+1. Clone or open the Spatial Persistence project (Git LFS required per their README).
+2. Inspect **`TextInputManager.ts`** — it builds `TextInputSystem.KeyboardOptions`, sets `onTextChanged` to push characters into the bound `Text`, and calls `global.textInputSystem.requestKeyboard(this.options)` when the toggle turns on.
+3. In **Travel Planner**, add an empty Scene Object (e.g. `TripTextInputManager`) and attach a script **copied or adapted** from that sample (same `require("LensStudio:TextInputModule")` / `global.textInputSystem` usage).
+4. In the Hierarchy, add a **Toggle Button** prefab from **Spectacles Interaction Kit** next to your keyboard row (or repurpose a chip meant for “Edit text”).
+5. Assign **`registerTextInput(toggle, text)`** (or equivalent) so the toggle opens the AR keyboard for **`keyboardEntryText`** — the same `Text` `AIAssistantUIBridge` reads on Confirm.
+6. Ensure **`keyboardModeRoot`** shows that toggle while keyboard capture is active if you want it visible only in keyboard flow.
+7. Build to **Spectacles** — `textInputSystem` behavior matches the sample (desktop Interactive Preview is limited compared to device).
+
+> Note: `TextInputSystem.KeyboardOptions` paths live in the Spectacles / Lens Studio typings; if TypeScript complains locally, mirror the sample’s imports or cast `(global as any).textInputSystem` like other scripts in this project use for optional globals.
+
+### Keyboard entry `Text` (critical)
+- **`keyboardEntryText`** must be the **typed-value line** — in the default hierarchy use **`VoiceListening_Status_Text`** (`…045`), **not** `PromptTitle_Text` (`…041`) and **not** `VoiceHint_Text` (`…044`). Wrong assignment overwrites the title or mixes voice hints with the keyboard buffer.
+- If the Inspector shows **`VoiceListening_Status_Text_Placeholder`**, assign the **child `Text`** named **`VoiceListening_Status_Text`**, not the placeholder root.
 
 ### Keyboard entry mode (optional)
-Assign these inspector fields on `AIAssistantUIBridge`:
-- `keyboardEntryText`: text object that receives typed value
-- `keyboardPromptText`: prompt line for step instructions
-- `keyboardModeRoot`: panel root shown only while keyboard mode is on
+Assign on `AIAssistantUIBridge`:
+- `keyboardPromptText` → `PromptSubtitle_Text` (`…042`) for step instructions
+- `keyboardModeRoot` → panel root shown only while keyboard mode is on (optional)
 
 Step sequence:
 1. departure city
@@ -37,16 +64,16 @@ Step sequence:
 Each step requires pinch confirm.
 
 ### Pack Scan HUD (wired)
-- `CategoryPlanDetailController.packScanHud` -> `PackScanHUD_Placeholder`
-- `PackScanController.scanButton` -> `Btn_ConfirmInput_Placeholder` PinchButton
-- `PackScanController.packHudText` -> `PackScanHUD_Text`
-- `PackScanController.detailBodyText` -> `CategoryDetail_Text`
-- `PackScanController.observedItemsText` -> keyboard entry text object
+- `CategoryPlanDetailController.packScanHud` → `PackScanHUD_Placeholder`
+- `PackScanController.scanButton` → PinchButton on **`Btn_Scan_Pack`** / `ScanPack` capsule (not Confirm Input; that pinch is for keyboard confirm only).
+- `PackScanController.packHudText` → `PackScanHUD_Text`
+- `PackScanController.detailBodyText` → `CategoryDetail_Text`
+- `PackScanController.observedItemsText` → **leave unassigned** unless you add a dedicated “items I packed” `Text`. If this points at **`keyboardEntryText`**, Gemini will treat trip field typing as a packing list (“Mic”, city names, etc.).
 
 Flow:
 1. Open **Pack** category row (enables `PackScanHUD_Placeholder`).
-2. Enter packed items in the keyboard entry text.
-3. Pinch **Confirm Input** to run scan and generate packing feedback.
+2. Pinch **Scan Pack** to run a **trip-context-only** text check (no camera frame yet).
+3. Optional: assign a separate `Text` to `observedItemsText` when you want user-typed item lists in the prompt.
 
 ### Loading bar while generating plan
 On `GeminiAssistant`, assign:
@@ -106,18 +133,17 @@ App_TravelRoot
     │   └── AssistantStatus_Text_Placeholder (+ Text) ← wired to GeminiAssistant.statusText
     └── Bottom_HUD_Placeholder
         ├── VoiceBar_Placeholder
-        │   ├── VoiceHint_Text_Placeholder (+ Text) ← wired to AIAssistantUIBridge.hintText
-        │   └── VoiceListening_Status_Text_Placeholder (+ Text) ← wired to ASRQueryController.statusText
+        │   ├── VoiceHint_Text_Placeholder (+ Text) ← AIAssistantUIBridge.hintText + keyboard prompts + ASR hintEcho
+        │   └── VoiceListening_Status_Text_Placeholder (+ Text) ← ASRQueryController.statusText (listening / errors)
         ├── SecondaryActions_Row_Placeholder  ← optional Compare / Radar / Smart Pack / Map chips
-        ├── Voice_Input_Controller           ← ASRQueryController (mic PinchButton still unassigned)
-        ├── Btn_StartAssistant_Placeholder    ← add PinchButton prefab; assign to AIAssistantUIBridge.startAssistantButton
-        ├── Btn_PlanTrip_Placeholder          ← add PinchButton prefab; assign to AIAssistantUIBridge.planTripButton
-        └── Btn_MicToggle_Placeholder         ← add PinchButton prefab; assign to ASRQueryController.button
+        ├── Voice_Input_Controller           ← ASRQueryController (listen invoked from Voice Mode pinch via bridge)
+        ├── Btn_PlanTrip_Placeholder          ← PinchButton → AIAssistantUIBridge.planTripButton
+        └── (Voice Mode + Mic mute live under TravelPlanner_UI row — see below)
 ```
 
-**Already wired in scene YAML:** `GeminiAssistant` category roots/titles, `DestinationVisualizer` link, `NewInCityAssistant.geminiAssistant` → `GeminiAssistant`, bridge hint + ASR status texts.
+**Already wired in scene YAML:** `GeminiAssistant` category roots/titles, `DestinationVisualizer` link, `NewInCityAssistant.geminiAssistant` → `GeminiAssistant`, Voice Mode pinch → bridge + ASR toggle, optional mic mute pinch, ASR status + hint echo texts.
 
-**You still add:** PinchButton prefabs under the three `Btn_*_Placeholder` objects and assign them on **`AIAssistantUIBridge`** / **`ASRQueryController`**. Optional: swap placeholder **`Image`** materials/textures for real card chrome.
+**Optional polish:** reparent mic mute PinchButton from template examples under `TravelPlanner_UI` so it sits next to Voice Mode visually; swap placeholder **`Image`** materials/textures for real card chrome.
 
 ---
 

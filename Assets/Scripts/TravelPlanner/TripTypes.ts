@@ -60,6 +60,8 @@ export interface TripDraft {
   purpose: TripPurpose
   /** When user is already at destination / local-only: omit long-distance transport in planning. */
   skipLongDistanceTransport: boolean
+  /** Hobbies, food prefs, transport prefs (shortest/cheapest), family/work context — merged from voice. */
+  voicePreferenceNotes: string
 }
 
 export interface CategoryOption {
