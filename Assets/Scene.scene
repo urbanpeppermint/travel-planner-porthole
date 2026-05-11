@@ -691,7 +691,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 82391403-9747-4988-b9dc-7562cd643d32
+    - !<reference> d7e51551-89e2-4d52-be1c-56670739ccd9
   Mesh: !<reference> a0411073-3373-40b1-a793-fe937c115422
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -8511,20 +8511,16 @@
   Enabled: true
   ScriptAsset: !<reference> c43e5f10-7849-461a-b196-daa4e553b147
   ScriptInputsDefault:
-    toggledOffMaterial: true
-    toggledOffSelectMaterial: true
-    toggledOnMaterial: true
-    toggledOnSelectMaterial: true
-    disabledMaterial: true
+    {}
   ScriptTypesDefault:
     {}
   ScriptInputs:
     "":
-      toggledOffMaterial: !<reference.Material> 5e6e1132-90fd-4c58-86f9-eb992e6747f5
-      toggledOffSelectMaterial: !<reference.Material> 5e532a08-3935-4d6f-823a-ad221030c784
-      toggledOnMaterial: !<reference.Material> ba34ce5b-0385-4307-a803-f77fb63d057b
-      toggledOnSelectMaterial: !<reference.Material> 101caa1c-1088-43ed-a87c-0093b8f7e8b1
-      disabledMaterial: !<reference.Material> aacbe4a8-55c5-457a-9a89-7ecf366ca72a
+      toggledOffMaterial: !<reference.Material> d5d07511-e6ad-48ad-935b-dba8520528e9
+      toggledOffSelectMaterial: !<reference.Material> d5d07511-e6ad-48ad-935b-dba8520528e9
+      toggledOnMaterial: !<reference.Material> d5d07511-e6ad-48ad-935b-dba8520528e9
+      toggledOnSelectMaterial: !<reference.Material> d5d07511-e6ad-48ad-935b-dba8520528e9
+      disabledMaterial: !<reference.Material> d5d07511-e6ad-48ad-935b-dba8520528e9
       meshVisuals: !<reference.RenderMeshVisual[]>
         - !<reference> bac4e3a0-0cea-4bf5-bda8-28df9f509f7e
   ScriptTypes:
@@ -12670,7 +12666,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 5e6e1132-90fd-4c58-86f9-eb992e6747f5
+    - !<reference> 4cba0208-9b4a-435e-bfc8-a8bbeeb65d68
   Mesh: !<reference> c09ad349-1946-4964-ae72-c43058805b41
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -13524,7 +13520,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> ba34ce5b-0385-4307-a803-f77fb63d057b
+    - !<reference> d7e51551-89e2-4d52-be1c-56670739ccd9
   Mesh: !<reference> e62b97db-847f-4bfa-98c4-5dd5c78c5362
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
