@@ -4,9 +4,7 @@
     - !<own> 02c82616-bed4-4813-8230-043f8e565170
 - !<PassInfo/02c82616-bed4-4813-8230-043f8e565170>
   CachedProperties:
-    - PreviewEnabled:
-        typeIdx: 0
-        value: 0
+    []
   DepthWrite: false
   DepthTest: true
   DepthFunction: LessEqual
@@ -21,5 +19,7 @@
     []
   BlendMode: PremultipliedAlphaAuto
   Properties:
-    {}
+    PreviewEnabled:
+      typeIdx: 0
+      value: 0
   Pass: !<reference> cde7cabf-893c-4788-b0f6-e02252a98bfc

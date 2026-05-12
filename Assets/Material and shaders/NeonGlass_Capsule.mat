@@ -118,7 +118,7 @@
   PolygonOffset: {x: 0.000000, y: 0.000000}
   FrustumCulling: Auto
   FrustumCullPad: 0.000000
-  InstanceCount: 1
+  InstanceCount: 3
   Defines:
     []
   BlendMode: PremultipliedAlphaAuto

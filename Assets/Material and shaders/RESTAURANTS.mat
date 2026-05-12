@@ -4,9 +4,7 @@
     - !<own> a69b316d-7417-44ee-9be9-70818e132eb4
 - !<PassInfo/a69b316d-7417-44ee-9be9-70818e132eb4>
   CachedProperties:
-    - PreviewEnabled:
-        typeIdx: 0
-        value: 0
+    []
   DepthWrite: false
   DepthTest: true
   DepthFunction: LessEqual
@@ -16,10 +14,12 @@
   PolygonOffset: {x: 0.000000, y: 0.000000}
   FrustumCulling: Auto
   FrustumCullPad: 0.000000
-  InstanceCount: 1
+  InstanceCount: 3
   Defines:
     []
   BlendMode: PremultipliedAlphaAuto
   Properties:
-    {}
+    PreviewEnabled:
+      typeIdx: 0
+      value: 0
   Pass: !<reference> bda6e5cd-01cd-447a-bbb8-12ce85906ef6

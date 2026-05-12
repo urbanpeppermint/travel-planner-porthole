@@ -17,8 +17,8 @@
   InstanceCount: 1
   Defines:
     - ENABLE_BASE_TEX
-    - ENABLE_NORMALMAP
     - ENABLE_LIGHTING
+    - ENABLE_NORMALMAP
   BlendMode: Disabled
   Properties:
     Port_Center_N016:

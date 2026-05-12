@@ -1,0 +1,41 @@
+- !<NativePackageDescriptor/0ca758c0-5c56-428c-9b93-6de4346c1fc3>
+  PackagePath: ""
+  StudioVersion:
+    major: 5
+    minor: 15
+    patch: 0
+    build: 25101318
+    type: Unset
+    buildFlavor: ""
+    timestamp: 0
+    commit: ""
+  Description: |-
+    Mic ON / OFF Provides an animated graphic hint and a helper script that allows to configure hint behavior
+    
+    Usage:
+    Drag and drop the asset "Hint - Microphone__PUT_IN_ORTHO_CAM" into your scene, under the Orthographic Camera. The hint will start playing automatically when the Lens is opened.
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  UpdateCheckpoint: 76
+  ExportUid: e2827e05-db48-466c-a630-fc952c80de8f
+  ComponentUid: 6614b0b0-0d26-443d-ab08-6bd3d024c7bf
+  PackagePolicy: CanBeUnpackedTransparent
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  Instantiable: !<reference> 00000000-0000-0000-0000-000000000000
+  AssetLibraryDependencyStructure: !<AssetLibraryDependencyStructure>
+    Name: ""
+    AssetId: ""
+    Hash: ""
+    Version:
+      major: 0
+      minor: 0
+      patch: 0
+      build: 0

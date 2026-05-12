@@ -1,0 +1,298 @@
+{
+
+"images": [
+    "LPD-309_atlas_transition_v01.png"
+],
+
+"frames": [
+{
+    "name": "01_00027.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 3,
+        "y": 3,
+        "width": 106,
+        "height": 106
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 83,
+        "top": 99,
+        "right": 189,
+        "bottom": 205
+    }
+},{
+    "name": "01_00028.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 113,
+        "y": 3,
+        "width": 112,
+        "height": 111
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 80,
+        "top": 97,
+        "right": 192,
+        "bottom": 208
+    }
+},{
+    "name": "01_00029.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 229,
+        "y": 3,
+        "width": 118,
+        "height": 117
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 77,
+        "top": 94,
+        "right": 195,
+        "bottom": 211
+    }
+},{
+    "name": "01_00030.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 351,
+        "y": 3,
+        "width": 124,
+        "height": 123
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 74,
+        "top": 91,
+        "right": 198,
+        "bottom": 214
+    }
+},{
+    "name": "01_00031.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 479,
+        "y": 3,
+        "width": 128,
+        "height": 129
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 72,
+        "top": 88,
+        "right": 200,
+        "bottom": 217
+    }
+},{
+    "name": "01_00032.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 611,
+        "y": 3,
+        "width": 140,
+        "height": 139
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 66,
+        "top": 83,
+        "right": 206,
+        "bottom": 222
+    }
+},{
+    "name": "01_00033.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 755,
+        "y": 3,
+        "width": 154,
+        "height": 153
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 59,
+        "top": 76,
+        "right": 213,
+        "bottom": 229
+    }
+},{
+    "name": "01_00034.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 3,
+        "y": 160,
+        "width": 166,
+        "height": 167
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 53,
+        "top": 69,
+        "right": 219,
+        "bottom": 236
+    }
+},{
+    "name": "01_00035.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 173,
+        "y": 160,
+        "width": 178,
+        "height": 179
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 47,
+        "top": 63,
+        "right": 225,
+        "bottom": 242
+    }
+},{
+    "name": "01_00036.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 355,
+        "y": 160,
+        "width": 188,
+        "height": 187
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 42,
+        "top": 59,
+        "right": 230,
+        "bottom": 246
+    }
+},{
+    "name": "01_00037.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 547,
+        "y": 160,
+        "width": 196,
+        "height": 195
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 38,
+        "top": 55,
+        "right": 234,
+        "bottom": 250
+    }
+},{
+    "name": "01_00038.png",
+    "texture": 0,
+    "samplingRect": {
+        "objectName": "",
+        "x": 747,
+        "y": 160,
+        "width": 202,
+        "height": 203
+    },
+    "rotated": false,
+    "trimmed": true,
+    "sourceSize": {
+        "objectName": "",
+        "width": 274,
+        "height": 302
+    },
+    "clipping": {
+        "left": 35,
+        "top": 51,
+        "right": 237,
+        "bottom": 254
+    }
+}
+],
+
+"animations": {
+    "01": { "frames": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }
+},
+
+"meta": {
+        "app": "http://www.codeandweb.com/texturepacker",
+        "description": "Json file for Lens Studio Framework",
+        "version": "1.0",
+        "smartupdate": "$TexturePacker:SmartUpdate:34eb07e11a305d88fdc5094bda99a8b4:b9e1f3fb4e7a21297676654b8c632c81:db5563a58a486953e4f99bf8d6dec0a4$"
+        "Created with TexturePacker (https://www.codeandweb.com/texturepacker) for Lens Studio"
+    }
+}

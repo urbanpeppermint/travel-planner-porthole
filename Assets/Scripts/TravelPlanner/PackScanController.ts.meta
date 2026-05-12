@@ -26,10 +26,18 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    cameraPreviewRoot: false
+    captureButton: false
+    captureIntervalMs: false
+    closeButton: false
+    cropCameraTexture: false
+    cropHintRoot: false
+    cropScanButton: false
     detailBodyText: false
     geminiAssistant: false
     geminiModel: false
     observedItemsText: false
+    originalCameraTexture: false
     packHudText: false
     packScanHud: false
     scanButton: false
@@ -45,21 +53,37 @@
   DefaultScriptInputs:
     - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       scanButton: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      captureButton: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      cropScanButton: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      closeButton: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
       packScanHud: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       packHudText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       detailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       observedItemsText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      cameraPreviewRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      originalCameraTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      cropCameraTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      cropHintRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       geminiModel: gemini-2.0-flash
+      captureIntervalMs: !<float> 250.000000
       verboseLogs: true
   ScriptTypes:
     -
       {}
   InputLines:
     - '// @input AssignableType geminiAssistant {"hint":"Trip context source (destination, dates, purpose)."}'
-    - '// @input AssignableType_1 scanButton {"hint":"Pinch button that triggers a pack scan while Pack HUD is visible."}'
-    - '// @input SceneObject packScanHud {"hint":"Pack HUD root. Scan runs only when this HUD is enabled."}'
-    - '// @input Component.Text packHudText {"hint":"Main text inside Pack HUD."}'
-    - '// @input Component.Text detailBodyText {"hint":"Optional category detail text to mirror the scan result."}'
-    - '// @input Component.Text observedItemsText {"hint":"Observed packed items text (typed by user / future OCR bridge)."}'
-    - '// @input string geminiModel = "gemini-2.0-flash" {"hint":"Gemini model for pack-check text generation."}'
+    - '// @input AssignableType_1 scanButton {"hint":"Pinch button that opens the Pack scan session."}'
+    - '// @input AssignableType_2 captureButton {"hint":"Pinch button shown while a session is open. Snapshots the current view to Gemini Vision."}'
+    - '// @input AssignableType_3 cropScanButton {"hint":"Pinch button that toggles Crop mode (hides the live preview, shows the crop hint)."}'
+    - '// @input AssignableType_4 closeButton {"hint":"Pinch button that closes the scan session, releases the preview, and clears the HUD inline text."}'
+    - '// @input SceneObject packScanHud {"hint":"Pack HUD root. Scan is gated to only run when this HUD is enabled."}'
+    - '// @input Component.Text packHudText {"hint":"Main inline text inside Pack HUD. Cleared by Close; latest result is mirrored to detailBodyText."}'
+    - '// @input Component.Text detailBodyText {"hint":"Persistent Pack detail text. Preserved across Close and the next time the category row is tapped."}'
+    - '// @input Component.Text observedItemsText {"hint":"Optional Text of items the user typed (kept for text-only fallback). Do NOT point at keyboard entry text."}'
+    - '// @input SceneObject cameraPreviewRoot {"hint":"SceneObject of the CropCameraTexture package preview (e.g. `CropCameraTextureTS`). Toggled visible while a session is open."}'
+    - '// @input Asset.Texture originalCameraTexture {"hint":"Original camera Texture from the package (Device Camera Texture). Used for full-frame capture."}'
+    - '// @input Asset.Texture cropCameraTexture {"hint":"Cropped camera Texture from the package (Screen Crop Texture). Used for cropped capture."}'
+    - '// @input SceneObject cropHintRoot {"hint":"Optional UI root for the Crop hint (text / dotted overlay). Shown only in Crop mode."}'
+    - '// @input string geminiModel = "gemini-2.0-flash" {"hint":"Gemini model for pack-check generation. gemini-2.0-flash supports inlineData images."}'
+    - '// @input float captureIntervalMs = 250 {"hint":"Capture interval (ms) hint for the VideoController used during a one-shot snapshot."}'
     - '// @input bool verboseLogs = true {"hint":"Enable PackScanController logs."}'

@@ -43,9 +43,6 @@
     - Port_WorldTangent_N004:
         typeIdx: 4
         value: {x: 0.000000, y: 0.000000, z: 1.000000}
-    - PreviewEnabled:
-        typeIdx: 0
-        value: 0
   DepthWrite: false
   DepthTest: true
   DepthFunction: LessEqual
@@ -55,10 +52,12 @@
   PolygonOffset: {x: 0.000000, y: 0.000000}
   FrustumCulling: Auto
   FrustumCullPad: 0.000000
-  InstanceCount: 1
+  InstanceCount: 8
   Defines:
     []
   BlendMode: PremultipliedAlphaAuto
   Properties:
-    {}
+    PreviewEnabled:
+      typeIdx: 0
+      value: 0
   Pass: !<reference> d254ea75-8f7a-4ce2-ad27-3e6a36c5ce2b

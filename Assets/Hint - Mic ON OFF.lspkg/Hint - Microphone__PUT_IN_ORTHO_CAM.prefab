@@ -1,0 +1,195 @@
+- !<ObjectPrefab/00c9c211-a596-4126-8cb6-9fd19602b226>
+  PackagePath: ""
+  objects:
+    - !<own> 4477b8b3-430c-4026-b197-f50e5d885ba3
+  LazyLoading: false
+  RetainAssets: true
+- !<ScreenTransform/287e2928-2ba2-40eb-8412-3a3f694e1f85>
+  PrefabRemaps:
+    []
+  Name: Screen Transform
+  Enabled: true
+  IsAdvanced: false
+  Constraints:
+    pinToLeft: false
+    pinToTop: false
+    pinToRight: false
+    pinToBottom: false
+    fixedWidth: false
+    fixedHeight: false
+    deactivatedFixedSprite: false
+    deactivatedFixedPivot: false
+  Pivot: {x: 0.000000, y: 0.000000}
+  Transform:
+    position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    hasSegmentScaleCompensation: false
+  RawMode: true
+  ForceBasic: true
+  Anchor:
+    left: -1.000000
+    bottom: -1.000000
+    right: 1.000000
+    top: 1.000000
+  Offset:
+    left: 0.000000
+    bottom: 0.000000
+    right: 0.000000
+    top: 0.000000
+- !<SceneObject/4477b8b3-430c-4026-b197-f50e5d885ba3>
+  PrefabRemaps:
+    - 287e2928-2ba2-40eb-8412-3a3f694e1f85: 287e2928-2ba2-40eb-7bed-c5c096b1e07a
+    - 4477b8b3-430c-4026-b197-f50e5d885ba3: 4477b8b3-430c-4026-4e68-0af1a277a45c
+    - 98268eec-cb8e-4f4f-b959-1c5fd2e773ed: 98268eec-cb8e-4f4f-46a6-e3a02d188c12
+    - bcb7a50b-f0ca-4f67-b7cc-ea868a410769: bcb7a50b-f0ca-4f67-4833-157975bef896
+    - fa899353-35d4-413d-be05-12ec56a7fd44: fa899353-35d4-413d-41fa-ed13a95802bb
+    - fac8e6b0-7742-4d75-9e98-f767c4a0d291: fac8e6b0-7742-4d75-6167-08983b5f2d6e
+    - fd8b64f6-3b8e-404b-9698-07457184aaec: fd8b64f6-3b8e-404b-6967-f8ba8e7b5513
+  Name: Hint - Microphone
+  Enabled: true
+  Layers: 1048576
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 98268eec-cb8e-4f4f-b959-1c5fd2e773ed
+  Components:
+    - !<own> fa899353-35d4-413d-be05-12ec56a7fd44
+    - !<own> 287e2928-2ba2-40eb-8412-3a3f694e1f85
+- !<SceneObject/98268eec-cb8e-4f4f-b959-1c5fd2e773ed>
+  PrefabRemaps:
+    []
+  Name: Mic Is On Off
+  Enabled: true
+  Layers: 1048576
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.064039, y: 0.063369, z: -80.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> fac8e6b0-7742-4d75-9e98-f767c4a0d291
+    - !<own> bcb7a50b-f0ca-4f67-b7cc-ea868a410769
+    - !<own> fd8b64f6-3b8e-404b-9698-07457184aaec
+- !<ScriptComponent/bcb7a50b-f0ca-4f67-b7cc-ea868a410769>
+  PrefabRemaps:
+    []
+  Name: VisualDemonstration
+  Enabled: true
+  ScriptAsset: !<reference> f705ac27-bd04-41fe-8cf3-6d3f651318bf
+  ScriptInputsDefault:
+    autostart: true
+    showType: true
+    appearDelay: true
+    advanced: true
+    disableHiding: true
+    hideOnCapture: true
+    hideOnCameraSwitch: true
+    eventCallbacks: true
+    callbackType: true
+    onVisualDemonstrationStartBehaviors: true
+    onVisualDemonstrationFinishBehaviors: true
+    onVisualDemonstrationStartCustomTriggers: true
+    onVisualDemonstrationFinishCustomTriggers: true
+    customFunctionScript: true
+    onVisualDemonstrationStartFunctions: true
+    onVisualDemonstrationFinishFunctions: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      autostart: true
+      visualDemonstration: !<reference.BaseMeshVisual> fd8b64f6-3b8e-404b-9698-07457184aaec
+      showType: 2
+      appearDelay: !<float> 0.000000
+      appearDuration: !<float> 0.000000
+      screenDuration: !<float> 3.000000
+      disappearDuration: 0.300000
+      repeatCount: 5
+      advanced: false
+      disableHiding: false
+      showOnce: true
+      hideOnCapture: true
+      hideOnCameraSwitch: true
+      eventCallbacks: false
+      callbackType: 0
+      onVisualDemonstrationStartBehaviors: !<reference.ScriptComponent[]>
+        []
+      onVisualDemonstrationFinishBehaviors: !<reference.ScriptComponent[]>
+        []
+      onVisualDemonstrationStartCustomTriggers: !<string[]>
+        []
+      onVisualDemonstrationFinishCustomTriggers: !<string[]>
+        []
+      customFunctionScript: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      onVisualDemonstrationStartFunctions: !<string[]>
+        []
+      onVisualDemonstrationFinishFunctions: !<string[]>
+        []
+  ScriptTypes:
+    "":
+      {}
+- !<ScreenRegionComponent/fa899353-35d4-413d-be05-12ec56a7fd44>
+  PrefabRemaps:
+    []
+  Name: Screen Region
+  Enabled: true
+  ScreenRegionType: FullFrame
+  ResizeWithKeyboard: false
+- !<ScreenTransform/fac8e6b0-7742-4d75-9e98-f767c4a0d291>
+  PrefabRemaps:
+    []
+  Name: Screen Transform
+  Enabled: true
+  IsAdvanced: false
+  Constraints:
+    pinToLeft: false
+    pinToTop: false
+    pinToRight: false
+    pinToBottom: false
+    fixedWidth: false
+    fixedHeight: false
+    deactivatedFixedSprite: false
+    deactivatedFixedPivot: false
+  Pivot: {x: 0.000000, y: 0.000000}
+  Transform:
+    position: {x: -0.064039, y: 0.063369, z: -80.000000}
+    rotation: {x: 0.000000, y: -0.000000, z: 0.000000}
+    scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    hasSegmentScaleCompensation: false
+  RawMode: true
+  ForceBasic: true
+  Anchor:
+    left: -0.585879
+    bottom: -0.230450
+    right: 0.516863
+    top: 0.203568
+  Offset:
+    left: 0.000000
+    bottom: 0.000000
+    right: 0.000000
+    top: 0.000000
+- !<Image/fd8b64f6-3b8e-404b-9698-07457184aaec>
+  PrefabRemaps:
+    []
+  Name: Image
+  Enabled: true
+  RenderOrder: 30
+  StretchMode: Fit
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> d328f887-d1be-460e-92cb-2e40810eb4ab
+  FlipX: false
+  FlipY: false
+  RotationAngle: 0
+  Pivot: {x: 0.000000, y: 0.000000}
+  ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000

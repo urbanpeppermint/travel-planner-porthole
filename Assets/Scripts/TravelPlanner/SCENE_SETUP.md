@@ -63,17 +63,55 @@ Step sequence:
 
 Each step requires pinch confirm.
 
-### Pack Scan HUD (wired)
-- `CategoryPlanDetailController.packScanHud` → `PackScanHUD_Placeholder`
-- `PackScanController.scanButton` → PinchButton on **`Btn_Scan_Pack`** / `ScanPack` capsule (not Confirm Input; that pinch is for keyboard confirm only).
-- `PackScanController.packHudText` → `PackScanHUD_Text`
-- `PackScanController.detailBodyText` → `CategoryDetail_Text`
-- `PackScanController.observedItemsText` → **leave unassigned** unless you add a dedicated “items I packed” `Text`. If this points at **`keyboardEntryText`**, Gemini will treat trip field typing as a packing list (“Mic”, city names, etc.).
+### Pack Scan HUD (single-controller, package-backed)
 
-Flow:
-1. Open **Pack** category row (enables `PackScanHUD_Placeholder`).
-2. Pinch **Scan Pack** to run a **trip-context-only** text check (no camera frame yet).
-3. Optional: assign a separate `Text` to `observedItemsText` when you want user-typed item lists in the prompt.
+Pack scan uses **one** controller — `PackScanController` — and the **CropCameraTexture** Asset Library package for the camera/crop texture work. There are no separate `CameraFeedController` / `CropPackScanController` scripts (those were removed; if you previously added them as components, delete the broken script components in the Lens Studio Inspector).
+
+**Two trigger points** for Pack details (both already work, nothing to add):
+- Pinch the **Scan Pack** PinchButton → opens a scan session in `PackScanController`.
+- Tap the **Pack category title** interactable → `CategoryPlanDetailController` opens the HUD + detail panel and shows the last scan result. No new scan runs from this path.
+
+**One-time scene setup:**
+
+1. From **Asset Library**, add **`Crop Camera Texture`**. Drag the package's prefab `Packages/CropCameraTexture.lspkg/Assets/CropCameraTextureTS__PLACE_IN_SCENE.prefab` under `PackScanHUD_Placeholder`. The package starts the camera on lens load and drives the preview image automatically — no per-frame code needed from us.
+2. In the Inspector for the package's `CameraTexture` script, set the crop rectangle (`cropLeft`, `cropRight`, `cropTop`, `cropBottom`, all in `-1..1`) so the **Crop mode** snapshot focuses on where the user will hold the bag (typically a centered square slightly below eye level).
+3. Add three new **PinchButtons** under `PackScanHUD_Placeholder`:
+   - `Btn_Capture_Pack`
+   - `Btn_Crop_Pack`
+   - `Btn_Close_Pack`
+4. (Optional) Add a `CropHint_Root` SceneObject with a Text + dotted box visual.
+
+**`PackScanController` inputs (assign in Inspector):**
+
+| Input | Wire to |
+|---|---|
+| `geminiAssistant` | `GeminiAssistant` on `Assistant_System` |
+| `scanButton` | PinchButton on `Btn_Scan_Pack` (existing) |
+| `captureButton` | PinchButton on `Btn_Capture_Pack` |
+| `cropScanButton` | PinchButton on `Btn_Crop_Pack` |
+| `closeButton` | PinchButton on `Btn_Close_Pack` |
+| `packScanHud` | `PackScanHUD_Placeholder` |
+| `packHudText` | `PackScanHUD_Text` |
+| `detailBodyText` | `CategoryDetail_Text` (persistent mirror) |
+| `observedItemsText` | leave empty unless you add a typed *“items I packed”* Text |
+| `cameraPreviewRoot` | SceneObject `CropCameraTextureTS` (the package prefab root) |
+| `originalCameraTexture` | `Packages/CropCameraTexture.lspkg/Assets/Render/Device Camera Texture.deviceCameraTexture` |
+| `cropCameraTexture` | `Packages/CropCameraTexture.lspkg/Assets/Render/Screen Crop Texture.screenCropTexture` |
+| `cropHintRoot` | optional `CropHint_Root` SceneObject |
+| `geminiModel` | `gemini-2.0-flash` (default) |
+
+**Runtime flow:**
+1. Open the **Pack** category row → `PackScanHUD_Placeholder` enabled, last result (if any) still shown in `CategoryDetail_Text`.
+2. Pinch **Scan Pack** → camera preview, Capture, Crop Scan, Close become visible.
+3. Pinch **Capture** (FullFrame) → snapshot of `originalCameraTexture` → RSG `VideoController` → base64 JPEG → Gemini Vision (`inlineData`) → result mirrored to `PackScanHUD_Text` and `CategoryDetail_Text`.
+4. Or pinch **Crop Scan** → live preview hides, **Crop hint** shows. Pinch **Capture** again → snapshot of `cropCameraTexture` (the cropped region only, no surroundings) → Gemini Vision.
+5. Pinch **Close** → preview + buttons hide, inline HUD text cleared, detail-panel mirror preserved.
+6. Pinching **Scan Pack** at any time restarts FullFrame mode and overwrites the next result.
+
+**Notes:**
+- Camera permission is requested by the package on lens start. The viewfinder is only **displayed** after Scan Pack is pinched; nothing is sent to any server until Capture.
+- Setup hints are emitted via `NativeLogger("PackScanController")`, not painted on the HUD text — open the Logger panel to see them while debugging.
+- Editor fallback: if `VideoController` or the camera is unavailable (Lens Studio preview without permission), Capture automatically falls back to a text-only Gemini call so the feature still produces a result.
 
 ### Loading bar while generating plan
 On `GeminiAssistant`, assign:
