@@ -1,9 +1,30 @@
-- !<Material/d5d07511-e6ad-48ad-935b-dba8520528e9>
+- !<Material/570a10bf-38a3-4d0a-a3bd-6c1c88aca7fd>
   PackagePath: ""
   PassesInfo:
-    - !<own> 434ce1e9-6a6d-44e5-86e2-055751273ebb
-- !<PassInfo/434ce1e9-6a6d-44e5-86e2-055751273ebb>
+    - !<own> 0e3c1c40-dbf2-4ed7-ac30-dcc1708855ef
+- !<PassInfo/0e3c1c40-dbf2-4ed7-ac30-dcc1708855ef>
   CachedProperties:
+    - correctedIntensity:
+        typeIdx: 1
+        value: 0.000000
+    - intensityTexture:
+        typeIdx: 9
+        value:
+          id: 00000000-0000-0000-0000-000000000000
+          sampler:
+            filteringMode: Trilinear
+            wrapModeU: Repeat
+            wrapModeV: Repeat
+            wrapModeW: Repeat
+            borderColor: {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
+            mipmaps: false
+          type: Texture2D
+    - intensityTextureTransform:
+        typeIdx: 7
+        value:
+          0: {x: 1.000000, y: 0.000000, z: 0.000000}
+          1: {x: 0.000000, y: 1.000000, z: 0.000000}
+          2: {x: 0.000000, y: 0.000000, z: 1.000000}
     - opacityTex:
         typeIdx: 9
         value:
@@ -22,7 +43,7 @@
           0: {x: 1.000000, y: 0.000000, z: 0.000000}
           1: {x: 0.000000, y: 1.000000, z: 0.000000}
           2: {x: 0.000000, y: 0.000000, z: 1.000000}
-  DepthWrite: true
+  DepthWrite: false
   DepthTest: true
   DepthFunction: LessEqual
   TwoSided: false
@@ -33,7 +54,9 @@
   FrustumCullPad: 0.000000
   InstanceCount: 1
   Defines:
+    - BLEND_MODE_OVERLAY
     - ENABLE_BASE_TEX
+    - ENABLE_CUSTOM_BLEND
     - ENABLE_NORMALMAP
     - NODE_13_DROPLIST_ITEM 0
     - NODE_181_DROPLIST_ITEM 0
@@ -42,7 +65,8 @@
     - NODE_38_DROPLIST_ITEM 0
     - NODE_49_DROPLIST_ITEM 0
     - NODE_69_DROPLIST_ITEM 0
-  BlendMode: Disabled
+    - sc_BlendMode_Custom
+  BlendMode: Overlay
   Properties:
     Port_AO_N036:
       typeIdx: 4
