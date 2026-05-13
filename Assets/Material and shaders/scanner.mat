@@ -1,8 +1,8 @@
-- !<Material/35d9d864-ffd1-4522-a9d3-f7e53167c654>
+- !<Material/56a0a871-b208-4797-8b5d-f0f8fd2e1ac9>
   PackagePath: ""
   PassesInfo:
-    - !<own> b9c1b35c-af8f-46ff-80ed-a424b2697050
-- !<PassInfo/b9c1b35c-af8f-46ff-80ed-a424b2697050>
+    - !<own> 6ba1810e-22ad-4083-a1b1-73a56af83790
+- !<PassInfo/6ba1810e-22ad-4083-a1b1-73a56af83790>
   CachedProperties:
     []
   DepthWrite: false
@@ -31,25 +31,7 @@
     Port_SpecularAO_N001:
       typeIdx: 4
       value: {x: 1.000000, y: 1.000000, z: 1.000000}
-    Port_Value_N005:
-      typeIdx: 1
-      value: 0.000000
     PreviewEnabled:
       typeIdx: 0
       value: 0
-    Tweak_N2:
-      typeIdx: 9
-      value:
-        id: c14509a0-ed49-424c-bf3f-7ecd30780100
-        sampler:
-          filteringMode: Trilinear
-          wrapModeU: Repeat
-          wrapModeV: Repeat
-          wrapModeW: Repeat
-          borderColor: {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
-          mipmaps: false
-        type: Texture2D
-    Tweak_N6:
-      typeIdx: 5
-      value: {x: 1.000000, y: 0.047059, z: 0.062745, w: 1.000000}
-  Pass: !<reference> cc88b71f-d0ef-48b4-9c91-369e8ff35bda
+  Pass: !<reference> e0229d97-8459-439a-961d-5b01693463ec

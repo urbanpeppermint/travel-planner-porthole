@@ -4,9 +4,7 @@
     - !<own> fcabd05f-8e25-4d5e-8ad1-37ca03e9286d
 - !<PassInfo/fcabd05f-8e25-4d5e-8ad1-37ca03e9286d>
   CachedProperties:
-    - Port_Default_N369:
-        typeIdx: 5
-        value: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    []
   DepthWrite: false
   DepthTest: false
   DepthFunction: LessEqual
@@ -18,32 +16,40 @@
   FrustumCullPad: 0.000000
   InstanceCount: 1
   Defines:
-    - NODE_13_DROPLIST_ITEM 0
-    - NODE_27_DROPLIST_ITEM 0
-    - NODE_49_DROPLIST_ITEM 0
-    - NODE_69_DROPLIST_ITEM 0
-    - ENABLE_BASE_TEX
-  BlendMode: PremultipliedAlphaAuto
+    []
+  BlendMode: Add
   Properties:
-    Port_Default_N204:
+    Port_AO_N001:
+      typeIdx: 4
+      value: {x: 1.000000, y: 1.000000, z: 1.000000}
+    Port_Metallic_N001:
+      typeIdx: 1
+      value: 0.000000
+    Port_Roughness_N001:
+      typeIdx: 1
+      value: 0.000000
+    Port_SpecularAO_N001:
+      typeIdx: 4
+      value: {x: 1.000000, y: 1.000000, z: 1.000000}
+    Port_Value_N005:
       typeIdx: 1
       value: 0.000000
     PreviewEnabled:
       typeIdx: 0
       value: 0
-    baseColor:
-      typeIdx: 5
-      value: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-    baseTex:
+    Tweak_N2:
       typeIdx: 9
       value:
         id: 88119ba8-f725-4831-ae05-63d513a442ba
         sampler:
           filteringMode: Trilinear
-          wrapModeU: ClampToEdge
-          wrapModeV: ClampToEdge
-          wrapModeW: ClampToEdge
-          borderColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+          wrapModeU: Repeat
+          wrapModeV: Repeat
+          wrapModeW: Repeat
+          borderColor: {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
           mipmaps: false
         type: Texture2D
-  Pass: !<reference> 581237de-9dda-44f9-b93b-cbf8e5dcac16
+    Tweak_N6:
+      typeIdx: 5
+      value: {x: 0.000000, y: 1.000000, z: 0.000000, w: 1.000000}
+  Pass: !<reference> cc88b71f-d0ef-48b4-9c91-369e8ff35bda

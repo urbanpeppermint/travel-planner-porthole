@@ -1,8 +1,8 @@
-- !<Material/35d9d864-ffd1-4522-a9d3-f7e53167c654>
+- !<Material/5bab4791-2007-4900-9d37-bb4cd2d3e1fd>
   PackagePath: ""
   PassesInfo:
-    - !<own> b9c1b35c-af8f-46ff-80ed-a424b2697050
-- !<PassInfo/b9c1b35c-af8f-46ff-80ed-a424b2697050>
+    - !<own> f2438069-e23f-4144-a0dc-f6b7cdfaf5cd
+- !<PassInfo/f2438069-e23f-4144-a0dc-f6b7cdfaf5cd>
   CachedProperties:
     []
   DepthWrite: false
@@ -40,7 +40,7 @@
     Tweak_N2:
       typeIdx: 9
       value:
-        id: c14509a0-ed49-424c-bf3f-7ecd30780100
+        id: 3ef6c64f-1764-4f8a-9eff-74d98dc9cdcd
         sampler:
           filteringMode: Trilinear
           wrapModeU: Repeat
@@ -51,5 +51,5 @@
         type: Texture2D
     Tweak_N6:
       typeIdx: 5
-      value: {x: 1.000000, y: 0.047059, z: 0.062745, w: 1.000000}
+      value: {x: 0.643137, y: 0.027451, z: 1.000000, w: 1.000000}
   Pass: !<reference> cc88b71f-d0ef-48b4-9c91-369e8ff35bda
