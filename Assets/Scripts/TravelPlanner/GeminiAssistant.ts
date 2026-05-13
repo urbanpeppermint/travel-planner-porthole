@@ -148,6 +148,8 @@ export class GeminiAssistant extends BaseScriptComponent {
   private userContextResolved: boolean = false
   private currentUserId: string = ''
   private lastTripPlan: TripPlanResponse | null = null
+  /** Prevents `CategoryPlanDetailController` from clearing the same `Text` while pack scan is mid-flight (device crash). */
+  private packScanDetailUiLockDepth: number = 0
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -319,11 +321,30 @@ export class GeminiAssistant extends BaseScriptComponent {
     return this.tripDraft
   }
 
+  /** True while pack scan owns the category detail body (do not clear/disable that UI). */
+  isPackScanDetailUiLocked(): boolean {
+    return this.packScanDetailUiLockDepth > 0
+  }
+
+  /** Call when entering pack scan `sending` from a non-sending state (once per capture). */
+  notifyPackScanDetailUiLockEntered(): void {
+    this.packScanDetailUiLockDepth++
+  }
+
+  /** Call when leaving `sending` to idle/open (pairs with entered lock). */
+  notifyPackScanDetailUiLockExited(): void {
+    if (this.packScanDetailUiLockDepth <= 0) {
+      return
+    }
+    this.packScanDetailUiLockDepth--
+  }
+
   /**
    * Stable trip labels for auxiliary prompts (e.g. Pack scan) before `requestTripPlan()`.
    * Departure: draft → detected user city → `fallbackDepartureCity`. Destination: draft,
-   * or mirrors departure when `defaultDestinationToCurrentCity`, else same fallbacks.
-   * Dates use localized fallback when empty.
+   * or mirrors departure when `defaultDestinationToCurrentCity`; if still empty, departure,
+   * then **User Context / detected** city, then `fallbackDepartureCity`.
+   * Dates use localized fallback when empty so pack scan always has a calendar anchor.
    */
   resolveTripSurfaceForPackScan(): TripDraft {
     const fb =
@@ -340,7 +361,7 @@ export class GeminiAssistant extends BaseScriptComponent {
       dest = dep.length > 0 ? dep : fb
     }
     if (!dest) {
-      dest = fb
+      dest = dep.length > 0 ? dep : detected.length > 0 ? detected : fb
     }
     const dateFb = this.getLocalizedDateFallback()
     return {
@@ -601,6 +622,13 @@ export class GeminiAssistant extends BaseScriptComponent {
       this.tripDraft.arrivalDateTime = fluentEndMonth.arrive
     }
 
+    if (this.tripDraft.departureDateTime.length === 0) {
+      const lone = this.extractLoneMonthDayInUtterance(lowered)
+      if (lone) {
+        this.tripDraft.departureDateTime = lone
+      }
+    }
+
     const purpose = this.extractPurpose(lowered)
     if (purpose !== '') {
       this.tripDraft.purpose = purpose
@@ -733,19 +761,20 @@ export class GeminiAssistant extends BaseScriptComponent {
   /** True when the user is clearly dictating a trip (not a short yes/no) — skip welcome gate. */
   private speechSupersedesDepartureWelcome(lowered: string): boolean {
     const forCities = this.expandHereAliasesInCityPhrases(lowered)
+    const forDates = this.normalizeVoiceDateTokens(forCities)
     if (this.extractCityPairFromFreeform(forCities)) {
       return true
     }
-    if (this.extractDateRangeFromFreeform(lowered)) {
+    if (this.extractDateRangeFromFreeform(forDates)) {
       return true
     }
-    if (this.extractRelativeDateRange(lowered)) {
+    if (this.extractRelativeDateRange(forDates)) {
       return true
     }
     if (/\bfrom\s+[a-z][a-z'\-]{1,28}\s+to\s+[a-z]/.test(forCities)) {
       return true
     }
-    if (/\b(depart|departure|return(?:ing)?|arriv(?:e|ing)?|until)\b/.test(lowered) && /\d/.test(lowered)) {
+    if (/\b(depart|departure|return(?:ing)?|arriv(?:e|ing)?|until)\b/.test(lowered) && /\d/.test(forDates)) {
       return true
     }
     if (/\bfrom here to\b/.test(lowered) || /\b(use my current location|my current location)\b/.test(lowered)) {
@@ -857,6 +886,57 @@ export class GeminiAssistant extends BaseScriptComponent {
       return ''
     }
     return this.monthDayToTripFormat(mi, dayNum)
+  }
+
+  /**
+   * Single "may 13" / "13 may" in a fluent sentence (no "may 13 to may 20" range) — fills departure
+   * when keyword-based parsing did not yield a strict calendar string.
+   */
+  private extractLoneMonthDayInUtterance(text: string): string | null {
+    const re = /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\s+(\d{1,2})(?:st|nd|rd|th)?\b/g
+    const found: { mon: string; day: number; index: number }[] = []
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      found.push({ mon: m[1], day: parseInt(m[2], 10), index: m.index })
+    }
+    if (found.length === 0) {
+      return null
+    }
+    if (found.length >= 2) {
+      const between = text.substring(found[0].index, found[1].index)
+      if (/\b(to|-|until)\b/.test(between)) {
+        return null
+      }
+    }
+    const parsed = this.parseSpokenMonthDayPair(found[0].mon, found[0].day)
+    return parsed.length > 0 ? parsed : null
+  }
+
+  /** Parses leading fragment after "depart"/"arrive" into dd/mm/yyyy when it is spoken month/day. */
+  private parseLooseSpokenDateFragment(frag: string): string {
+    const t = frag.trim().toLowerCase()
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(t)) {
+      return frag.trim()
+    }
+    if (/^tomorrow\b/.test(t)) {
+      return this.formatTripCalendarDate(this.addCalendarDays(new Date(), 1))
+    }
+    if (/^today\b/.test(t)) {
+      return this.formatTripCalendarDate(this.addCalendarDays(new Date(), 0))
+    }
+    const md = t.match(
+      /^\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\s+(\d{1,2})(?:st|nd|rd|th)?\b/,
+    )
+    if (md) {
+      return this.parseSpokenMonthDayPair(md[1], parseInt(md[2], 10))
+    }
+    const dm = t.match(
+      /^\s*(\d{1,2})(?:st|nd|rd|th)?(?:\s+of)?\s+((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\b/,
+    )
+    if (dm) {
+      return this.parseSpokenMonthDayPair(dm[2], parseInt(dm[1], 10))
+    }
+    return ''
   }
 
   private extractDateRangeFromFreeform(text: string): { depart: string; arrive: string } | null {
@@ -1514,7 +1594,11 @@ export class GeminiAssistant extends BaseScriptComponent {
     if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(frag.trim())) {
       return frag.trim()
     }
-    return frag.length > 48 ? frag.substring(0, 48).trim() : frag
+    const spoken = this.parseLooseSpokenDateFragment(frag)
+    if (spoken.length > 0) {
+      return spoken
+    }
+    return ''
   }
 
   private extractPurpose(text: string): TripPurpose | '' {

@@ -245,21 +245,6 @@
   ScriptTypes:
     "":
       {}
-- !<SceneObject/02dc9d54-1ba2-4397-8963-17696cf95d86>
-  PrefabRemaps:
-    []
-  Name: Object 0
-  Enabled: false
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: -1.514221, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> a9bf1bb5-c4cb-49b5-af81-b17882f2ce8f
 - !<SceneObject/031abae4-7029-4da6-89ec-08d2369c519f>
   PrefabRemaps:
     []
@@ -955,13 +940,12 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 8.000000, y: -10.059269, z: 0.000000}
+    Position: {x: 0.076972, y: -22.046770, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 11d807cb-94fb-49d9-b1cc-eea3e4b1e661
-    - !<own> b12c046e-9b29-447b-b727-df3e8b35893c
   Components:
     []
 - !<SceneObject/0b5e7a88-92f8-46b3-a296-d866efa7d20e>
@@ -1172,6 +1156,21 @@
   Components:
     - !<own> 2e4efcf0-c741-423c-8476-ed36f8957ac0
     - !<own> 88838fa8-77f8-4f41-97d2-4ff966b91665
+- !<SceneObject/113c130f-d2f0-4dd7-b9dc-7e1c368b1bc1>
+  PrefabRemaps:
+    []
+  Name: PackHUDtext
+  Enabled: false
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 9a7aecde-7f5d-4e6a-b3e7-0862ab3c4996
 - !<Image/11c82117-cbf3-4db4-b262-dc84598ab4d7>
   PrefabRemaps:
     []
@@ -1204,6 +1203,7 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> b9dded16-ecd8-45ba-945c-005b4b1cd3bc
+    - !<own> b12c046e-9b29-447b-b727-df3e8b35893c
   Components:
     - !<own> 195ac843-2555-47d4-b099-21b354384f12
     - !<own> 75e0b9b4-90e3-4dfc-927b-da1f6a2380b9
@@ -1648,7 +1648,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 9.147808, y: -16.559593, z: 0.000000}
+    Position: {x: 9.147808, y: -10.059300, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -3860,7 +3860,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 7.896808, y: -7.000000, z: 0.000000}
+    Position: {x: 7.896808, y: 3.618870, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -9399,11 +9399,11 @@
     - !<own> c6491846-82cc-4581-912f-1085655ff7ce
     - !<own> 35c80f68-1250-42b9-8844-3905e132ef57
     - !<own> 446450d7-2da6-4486-b722-1e621e05bff4
+    - !<own> d4b6ab66-937f-4377-9af4-99d569de2e39
     - !<own> 0b3c5fbe-d725-46bc-a2b6-ce469f106982
     - !<own> 6c5ec283-fcde-4730-ba84-b9d7c047757d
     - !<own> d1b68178-7275-445c-a1b6-ff3ac7cf3591
     - !<own> 16763326-061c-425f-8c1f-99f857f467d0
-    - !<own> d4b6ab66-937f-4377-9af4-99d569de2e39
     - !<own> f0e1a001-0001-4001-8001-000000000055
   Components:
     - !<own> a3dc4406-8ca0-4e4f-ae3a-056ba54628ab
@@ -10242,7 +10242,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: -8.000000, y: -7.000000, z: 0.000000}
+    Position: {x: -8.000000, y: 3.618870, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -10351,10 +10351,14 @@
   ScriptAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
   ScriptInputsDefault:
     packHudText: true
+    detailBodyText: true
     showLiveCameraPreview: true
     geminiModel: true
     captureIntervalMs: true
     verboseLogs: true
+    skipCameraEncodeInEditor: true
+    categoryPlanDetailBodyText: true
+    categoryPlanDetailController: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -10365,7 +10369,9 @@
       closeButton: !<MappingBased.AssignableType_3> 50dc9cf9-b2c8-46ee-bb34-e79cd0345b66
       packScanHud: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
       packHudText: !<reference.Text> 00000000-0000-0000-0000-000000000000
-      detailBodyText: !<reference.Text> f0e1b003-0001-4001-8001-000000000093
+      packScanResultText: !<reference.Text> a296bbaf-8515-44bf-9cdb-48c24fe87a41
+      detailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      categoryDetailPanelRoot: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
       observedItemsText: !<reference.Text> 2886019e-b507-46c2-aaf7-f08cb2807364
       cameraPreviewRoot: !<reference.SceneObject> 716b2d60-d946-46c1-b821-59a7e9f4e428
       showLiveCameraPreview: true
@@ -10374,6 +10380,9 @@
       geminiModel: gemini-2.0-flash
       captureIntervalMs: !<float> 250.000000
       verboseLogs: true
+      skipCameraEncodeInEditor: true
+      categoryPlanDetailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      categoryPlanDetailController: !<MappingBased.AssignableType_5> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":
       {}
@@ -11138,6 +11147,87 @@
     []
   Components:
     []
+- !<Text/9a7aecde-7f5d-4e6a-b3e7-0862ab3c4996>
+  PrefabRemaps:
+    []
+  Name: Text
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Text: Text
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 48
+  Font: !<reference> 00000000-0000-0000-0000-000000000000
+  LayoutRect:
+    left: -7.500000
+    bottom: -2.250000
+    right: 7.500000
+    top: 2.250000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Overflow
+  Fill: !<TextFill>
+    Mode: Solid
+    Color: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    Texture: !<reference> 00000000-0000-0000-0000-000000000000
+    ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    TileCount: 5.000000
+    TileZone: Rect
+    TextureStretch: FitWidth
+  BlendMode: PremultipliedAlpha
+  Outline: !<OutlineSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Size: 0.250000
+  Dropshadow: !<DropshadowSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    OffsetX: 0.250000
+    OffsetY: 0.250000
+  Background: !<BackgroundSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Margins:
+      left: 0.000000
+      bottom: 0.000000
+      right: 0.000000
+      top: 0.000000
+    CornerRadius: 0.000000
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.000000
+    CapitalizationOverride: None
+  DepthTest: false
+  TwoSided: false
 - !<RenderMeshVisual/9aeaa51a-0955-4e60-abd7-346a32f791b9>
   PrefabRemaps:
     []
@@ -11934,6 +12024,87 @@
   ScriptTypes:
     "":
       {}
+- !<Text/a296bbaf-8515-44bf-9cdb-48c24fe87a41>
+  PrefabRemaps:
+    []
+  Name: CategoryDetail_Text
+  Enabled: true
+  RenderOrder: 132
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Text: "After generation tap a category row for beta source, price, and tips."
+  Editable: false
+  ShowEditingPreview: false
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 36
+  Font: !<reference> 98536562-5cfd-496f-b9a5-9938a3e07308
+  LayoutRect:
+    left: -10.000000
+    bottom: -2.250000
+    right: 10.000000
+    top: 2.250000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Wrap
+  Fill: !<TextFill>
+    Mode: Solid
+    Color: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    Texture: !<reference> 00000000-0000-0000-0000-000000000000
+    ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    TileCount: 5.000000
+    TileZone: Rect
+    TextureStretch: FitWidth
+  BlendMode: PremultipliedAlpha
+  Outline: !<OutlineSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Size: 0.250000
+  Dropshadow: !<DropshadowSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    OffsetX: 0.250000
+    OffsetY: 0.250000
+  Background: !<BackgroundSettings>
+    Enabled: true
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.164706, y: 0.239216, z: 0.505882, w: 0.666667}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Margins:
+      left: 1.000000
+      bottom: 1.000000
+      right: 1.000000
+      top: 1.000000
+    CornerRadius: 2.000000
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.000000
+    CapitalizationOverride: None
+  DepthTest: false
+  TwoSided: false
 - !<ScriptComponent/a3dc4406-8ca0-4e4f-ae3a-056ba54628ab>
   PrefabRemaps:
     []
@@ -12499,87 +12670,6 @@
   ScriptTypes:
     "":
       {}
-- !<Text/a9bf1bb5-c4cb-49b5-af81-b17882f2ce8f>
-  PrefabRemaps:
-    []
-  Name: PackScanHUD_Text
-  Enabled: true
-  RenderOrder: 133
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Text: "Point camera at your packed items, then run scan."
-  Editable: false
-  ShowEditingPreview: true
-  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
-  SizeToFit: false
-  FontSize: 28
-  Font: !<reference> 00000000-0000-0000-0000-000000000000
-  LayoutRect:
-    left: -7.500000
-    bottom: -2.250000
-    right: 7.500000
-    top: 2.250000
-  OverflowVertical: Overflow
-  OverflowHorizontal: Wrap
-  Fill: !<TextFill>
-    Mode: Solid
-    Color: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-    Texture: !<reference> 00000000-0000-0000-0000-000000000000
-    ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-    TileCount: 5.000000
-    TileZone: Rect
-    TextureStretch: FitWidth
-  BlendMode: PremultipliedAlpha
-  Outline: !<OutlineSettings>
-    Enabled: false
-    Fill: !<TextFill>
-      Mode: Solid
-      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
-      Texture: !<reference> 00000000-0000-0000-0000-000000000000
-      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-      TileCount: 5.000000
-      TileZone: Rect
-      TextureStretch: FitWidth
-    Size: 0.250000
-  Dropshadow: !<DropshadowSettings>
-    Enabled: false
-    Fill: !<TextFill>
-      Mode: Solid
-      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
-      Texture: !<reference> 00000000-0000-0000-0000-000000000000
-      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-      TileCount: 5.000000
-      TileZone: Rect
-      TextureStretch: FitWidth
-    OffsetX: 0.250000
-    OffsetY: 0.250000
-  Background: !<BackgroundSettings>
-    Enabled: false
-    Fill: !<TextFill>
-      Mode: Solid
-      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
-      Texture: !<reference> 00000000-0000-0000-0000-000000000000
-      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-      TileCount: 5.000000
-      TileZone: Rect
-      TextureStretch: FitWidth
-    Margins:
-      left: 0.000000
-      bottom: 0.000000
-      right: 0.000000
-      top: 0.000000
-    CornerRadius: 0.000000
-  AdvancedLayout: !<TextAdvancedLayout>
-    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
-    LetterSpacing: 0.000000
-    LineSpacing: 1.000000
-    CapitalizationOverride: None
-  DepthTest: false
-  TwoSided: false
 - !<ScreenTransform/aa0e7f46-441b-461b-9c72-c82ff011b0b0>
   PrefabRemaps:
     []
@@ -14668,7 +14758,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: -7.000000, z: 0.000000}
+    Position: {x: 0.000000, y: 3.618870, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -14961,7 +15051,7 @@
   Enabled: true
   ScriptAsset: !<reference> cadeca01-0001-4001-8001-000000000001
   ScriptInputsDefault:
-    {}
+    packScanDetailText: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -14977,6 +15067,7 @@
       detailBodyText: !<reference.Text> f0e1b003-0001-4001-8001-000000000093
       weatherAccuBridge: !<MappingBased.AssignableType_1> f0e1d006-0001-4001-8001-000000000071
       packScanHud: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
+      packScanDetailText: !<reference.Text> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":
       {}
@@ -15731,9 +15822,9 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: -8.175735, y: -3.150509, z: 1.000000}
+    Position: {x: -12.712909, y: -1.945000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.300000, y: 1.300000, z: 1.300000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 9952becb-cd87-4ed2-8e26-ce01074fa31e
@@ -15881,13 +15972,16 @@
   Enabled: true
   ScriptAsset: !<reference> 445b8d9f-487b-4c0c-9c7a-94f7ef2d6d2b
   ScriptInputsDefault:
-    {}
+    autoResumeListeningAfterUtterance: true
+    autoResumeDelaySec: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
     "":
       statusText: !<reference.Text> f0e1b003-0001-4001-8001-000000000043
       hintEchoText: !<reference.Text> f0e1b003-0001-4001-8001-000000000044
+      autoResumeListeningAfterUtterance: true
+      autoResumeDelaySec: 0.280000
   ScriptTypes:
     "":
       {}
@@ -17420,7 +17514,6 @@
     - !<own> f0e1d005-0001-4001-8001-000000000001
     - !<own> f0e1d005-0001-4001-8001-000000000002
     - !<own> cadeca01-0001-4001-8001-000000000010
-    - !<own> f0e1d007-0001-4001-8001-000000000010
 - !<SceneObject/f0e1a001-0001-4001-8001-000000000010>
   PrefabRemaps:
     []
@@ -17899,11 +17992,12 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    - !<own> 02dc9d54-1ba2-4397-8963-17696cf95d86
     - !<own> dec2eb19-57d5-44af-a5ff-f1e6cd236343
     - !<own> f3f1345f-43a9-4cc7-be26-bacb0ac0cc7d
     - !<own> 080e6f68-ed2c-4ba5-9bca-cd7c2e9f2009
     - !<own> 716b2d60-d946-46c1-b821-59a7e9f4e428
+    - !<own> fe574534-c513-4a51-bba8-3d38a61aeac6
+    - !<own> 113c130f-d2f0-4dd7-b9dc-7e1c368b1bc1
   Components:
     - !<own> 908ee5d6-53c4-4977-a64a-99ff49b8913d
 - !<Text/f0e1b003-0001-4001-8001-000000000041>
@@ -19165,13 +19259,16 @@
   Enabled: true
   ScriptAsset: !<reference> 445b8d9f-487b-4c0c-9c7a-94f7ef2d6d2b
   ScriptInputsDefault:
-    {}
+    autoResumeListeningAfterUtterance: true
+    autoResumeDelaySec: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
     "":
       statusText: !<reference.Text> f0e1b003-0001-4001-8001-000000000042
       hintEchoText: !<reference.Text> f0e1b003-0001-4001-8001-000000000044
+      autoResumeListeningAfterUtterance: true
+      autoResumeDelaySec: 0.280000
   ScriptTypes:
     "":
       {}
@@ -19194,44 +19291,6 @@
       defaultLatitude: !<string> 52.5200
       defaultLongitude: !<string> 13.4050
       fetchOnStart: true
-  ScriptTypes:
-    "":
-      {}
-- !<ScriptComponent/f0e1d007-0001-4001-8001-000000000010>
-  PrefabRemaps:
-    []
-  Name: PackScanController
-  Enabled: false
-  ScriptAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
-  ScriptInputsDefault:
-    captureButton: true
-    closeButton: true
-    observedItemsText: true
-    cameraPreviewRoot: true
-    originalCameraTexture: true
-    weatherAccuBridge: true
-    geminiModel: true
-    captureIntervalMs: true
-    verboseLogs: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      geminiAssistant: !<MappingBased.AssignableType> f0e1d005-0001-4001-8001-000000000001
-      scanButton: !<MappingBased.AssignableType_1> 78476e02-7aa6-400c-a44f-672833994772
-      captureButton: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
-      closeButton: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
-      packScanHud: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
-      packHudText: !<reference.Text> f0e1b003-0001-4001-8001-000000000094
-      detailBodyText: !<reference.Text> f0e1b003-0001-4001-8001-000000000093
-      observedItemsText: !<reference.Text> 00000000-0000-0000-0000-000000000000
-      cameraPreviewRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      showLiveCameraPreview: false
-      originalCameraTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
-      weatherAccuBridge: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
-      geminiModel: gemini-2.0-flash
-      captureIntervalMs: !<float> 250.000000
-      verboseLogs: true
   ScriptTypes:
     "":
       {}
@@ -19862,6 +19921,21 @@
     bottom: -2.000000
     right: 3.000000
     top: 2.000000
+- !<SceneObject/fe574534-c513-4a51-bba8-3d38a61aeac6>
+  PrefabRemaps:
+    []
+  Name: ScanDetail_Text_Body
+  Enabled: false
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 25.294456, y: 6.604627, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> a296bbaf-8515-44bf-9cdb-48c24fe87a41
 - !<SceneObject/fe66bb72-6c90-42c5-bc72-2915d91b4804>
   PrefabRemaps:
     []

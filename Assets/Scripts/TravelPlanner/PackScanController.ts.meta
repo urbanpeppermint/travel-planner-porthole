@@ -29,6 +29,9 @@
     cameraPreviewRoot: false
     captureButton: false
     captureIntervalMs: false
+    categoryDetailPanelRoot: false
+    categoryPlanDetailBodyText: false
+    categoryPlanDetailController: false
     closeButton: false
     detailBodyText: false
     geminiAssistant: false
@@ -37,8 +40,10 @@
     originalCameraTexture: false
     packHudText: false
     packScanHud: false
+    packScanResultText: false
     scanButton: false
     showLiveCameraPreview: false
+    skipCameraEncodeInEditor: false
     verboseLogs: false
     weatherAccuBridge: false
   ScriptTypesHidden:
@@ -56,7 +61,9 @@
       closeButton: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       packScanHud: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       packHudText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      packScanResultText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       detailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      categoryDetailPanelRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       observedItemsText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       cameraPreviewRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       showLiveCameraPreview: true
@@ -65,6 +72,9 @@
       geminiModel: gemini-2.0-flash
       captureIntervalMs: !<float> 250.000000
       verboseLogs: true
+      skipCameraEncodeInEditor: true
+      categoryPlanDetailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      categoryPlanDetailController: !<MappingBased.AssignableType_5> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
@@ -72,10 +82,12 @@
     - '// @input AssignableType geminiAssistant {"hint":"Trip context source (destination, dates, purpose)."}'
     - '// @input AssignableType_1 scanButton {"hint":"Pinch button that opens the Pack scan session."}'
     - '// @input AssignableType_2 captureButton {"hint":"Pinch button shown while a session is open. Snapshots the camera frame to Gemini Vision."}'
-    - '// @input AssignableType_3 closeButton {"hint":"Pinch button that closes the scan session (capture UI only; detail text stays on CategoryDetail_Text)."}'
+    - '// @input AssignableType_3 closeButton {"hint":"Pinch button that closes the scan session (capture UI only; pack result `Text` unchanged)."}'
     - '// @input SceneObject packScanHud {"hint":"Pack HUD root. Scan is gated to only run when this HUD is enabled."}'
-    - '// @input Component.Text packHudText {"hint":"Deprecated — leave unassigned. Pack scan uses `detailBodyText` only (same line as category detail)."}'
-    - '// @input Component.Text detailBodyText {"hint":"Category detail body (e.g. `CategoryDetail_Text` on `CategoryDetail_Text_Body`). All pack messages + scan results write here."}'
+    - '// @input Component.Text packHudText {"hint":"Deprecated — unused for output. Assign `packScanResultText` or `detailBodyText` instead."}'
+    - '// @input Component.Text packScanResultText {"hint":"Optional dedicated pack scan output (e.g. `ScanDetail_Text_Body`). If set, all pack lines write here only and trip-plan detail clear will not race this `Text`."}'
+    - '// @input Component.Text detailBodyText {"hint":"Category detail body when not using `packScanResultText` (e.g. `CategoryDetail_Text`)."}'
+    - '// @input SceneObject categoryDetailPanelRoot {"hint":"SceneObject to enable before writing `detailBodyText` / `packScanResultText` (e.g. parent card or `PackScanHUD_Placeholder` when the scan text lives under the pack HUD)."}'
     - '// @input Component.Text observedItemsText {"hint":"Optional Text of items the user typed (kept for text-only fallback). Do NOT point at keyboard entry text."}'
     - '// @input SceneObject cameraPreviewRoot {"hint":"Optional live camera preview root (e.g. CropCameraTexture prefab). Shown while a session is open when `showLiveCameraPreview` is on."}'
     - '// @input bool showLiveCameraPreview = true {"hint":"Show `cameraPreviewRoot` during an open scan session (including while analyzing after Capture). Off = no on-screen camera panel."}'
@@ -84,3 +96,6 @@
     - '// @input string geminiModel = "gemini-2.0-flash" {"hint":"Gemini model for pack-check generation. gemini-2.0-flash supports inlineData images."}'
     - '// @input float captureIntervalMs = 250 {"hint":"Capture interval (ms) hint for the VideoController used during a one-shot snapshot."}'
     - '// @input bool verboseLogs = true {"hint":"Enable PackScanController logs."}'
+    - '// @input bool skipCameraEncodeInEditor = true {"hint":"In Lens Studio editor preview, skip VideoController (camera JPEG encode) and use text-only pack — avoids frequent editor native crashes when the scan result appears."}'
+    - '// @input Component.Text categoryPlanDetailBodyText {"hint":"Same `Text` as CategoryPlanDetailController.detailBodyText (e.g. CategoryDetail_Text). Cleared when Scan Pack opens so only the scan line shows."}'
+    - '// @input AssignableType_5 categoryPlanDetailController {"hint":"Optional — restores the category panel after **Close** on an open or sending session (no parent disable)."}'

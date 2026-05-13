@@ -24,7 +24,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Voice capture: assign PinchButton under Btn_VoiceMode_Placeholder. First pinch = welcome + listen; after each utterance listening restarts automatically (pinch again only to stop or override).')
+  @hint('Voice capture: assign PinchButton under Btn_VoiceMode_Placeholder. Pinch = welcome (once) + start/stop speech-to-text.')
   startAssistantButton: PinchButton
 
   @input
@@ -86,11 +86,6 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
   private readonly keyboardSteps = ['departure city', 'destination city', 'departure date', 'arrival date']
   private keyboardOptions: any = null
   private textInputPrimed: boolean = false
-  /** Cancels pending `scheduleResumeVoiceListening` callbacks when Voice pinch runs again. */
-  private voiceResumeToken: number = 0
-
-  /** True after at least one voice transcript in this session; avoids auto-opening mic after Plan Trip if user never used voice. */
-  private voiceSessionActive: boolean = false
 
   /** Fires whenever the keyboard step prompt line updates (for optional TTS via `AssistantTtsController`). */
   readonly onKeyboardGuidance: Event<string> = new Event<string>()
@@ -167,8 +162,8 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
       this.travelPlannerController?.syncFromTripDraft(draft)
     })
     this.geminiAssistant.onTripPlanReady.add(() => {
-      if (this.voiceSessionActive) {
-        this.scheduleResumeVoiceListening(0.55)
+      if (this.asrQueryController) {
+        this.asrQueryController.scheduleResumeListeningAfterTurn(this.keyboardModeEnabled)
       }
     })
     this.travelPlannerController?.syncFromTripDraft(this.geminiAssistant.getTripDraft())
@@ -184,7 +179,6 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
     if (voicePinch) {
       voicePinch.onButtonPinched.add(() => {
-        this.voiceResumeToken++
         if (this.keyboardModeEnabled) {
           this.dismissTripKeyboard()
           this.keyboardModeEnabled = false
@@ -235,8 +229,6 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
     if (this.clearInputsButton) {
       this.clearInputsButton.onButtonPinched.add(() => {
-        this.voiceResumeToken++
-        this.voiceSessionActive = false
         this.keyboardModeEnabled = false
         this.keyboardStepIndex = 0
         this.dismissTripKeyboard()
@@ -260,51 +252,22 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
       return
     }
 
-    this.voiceSessionActive = true
     const normalized = query.toLowerCase().trim()
     this.geminiAssistant.handleSpeechTranscript(query)
     this.setHint(query.trim())
 
-    const triggeredPlan =
+    const triggersPlan =
       normalized.indexOf('plan my trip') >= 0 ||
       normalized.indexOf('show options') >= 0 ||
       normalized.indexOf('find options') >= 0
-    if (triggeredPlan) {
+    if (triggersPlan) {
       this.geminiAssistant.requestTripPlan()
     }
 
-    if (!this.keyboardModeEnabled && this.asrQueryController && !this.asrQueryController.getMicMuted()) {
-      if (!triggeredPlan) {
-        this.scheduleResumeVoiceListening(0.32)
-      }
+    const skipAutoResume = this.keyboardModeEnabled || triggersPlan
+    if (this.asrQueryController) {
+      this.asrQueryController.scheduleResumeListeningAfterTurn(skipAutoResume)
     }
-  }
-
-  /** After ASR finalizes, briefly wait then start listening again so the user need not pinch Voice Mode every turn. */
-  private scheduleResumeVoiceListening(delaySec: number): void {
-    if (!this.asrQueryController || this.asrQueryController.getMicMuted()) {
-      return
-    }
-    this.voiceResumeToken++
-    const token = this.voiceResumeToken
-    const delayed = this.createEvent('DelayedCallbackEvent')
-    delayed.bind(() => {
-      if (token !== this.voiceResumeToken) {
-        return
-      }
-      if (this.keyboardModeEnabled || !this.asrQueryController || this.asrQueryController.getMicMuted()) {
-        return
-      }
-      if (this.asrQueryController.getIsRecording()) {
-        return
-      }
-      try {
-        this.asrQueryController.toggleRecording()
-      } catch (e) {
-        print(`[AIAssistantUIBridge] scheduleResumeVoiceListening: toggleRecording failed: ${e}`)
-      }
-    })
-    delayed.reset(delaySec)
   }
 
   private setHint(message: string): void {
@@ -314,7 +277,6 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
   }
 
   private enterKeyboardMode(): void {
-    this.voiceResumeToken++
     if (this.asrQueryController && this.asrQueryController.getIsRecording()) {
       this.asrQueryController.toggleRecording()
     }

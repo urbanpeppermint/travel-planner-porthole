@@ -4,6 +4,7 @@ import { Gemini } from 'RemoteServiceGateway.lspkg/HostedExternal/GoogleGenAI'
 import { GoogleGenAITypes } from 'RemoteServiceGateway.lspkg/HostedExternal/GoogleGenAITypes'
 import { VideoController } from 'RemoteServiceGateway.lspkg/Helpers/VideoController'
 import { GeminiAssistant } from './GeminiAssistant'
+import { CategoryPlanDetailController } from './CategoryPlanDetailController'
 import { WeatherAccuBridge } from './WeatherAccuBridge'
 
 type PackScanState = 'idle' | 'open' | 'sending'
@@ -12,7 +13,14 @@ type PackScanState = 'idle' | 'open' | 'sending'
  * Pack scan: **Scan Pack** opens a session (Capture + Close; optional live preview), **Capture**
  * sends one frame from `originalCameraTexture` to Gemini Vision. **Live preview defaults on**
  * so users see the capture frame on-screen; turn **`showLiveCameraPreview`** off if you prefer passthrough-only.
- * All pack status + results go to **`detailBodyText`** (same `CategoryDetail_Text` as category rows).
+ * All pack status + results go to **`packScanResultText`** when set, otherwise **`detailBodyText`**.
+ * If your result `Text` lives under **`packScanHud`**, never let another script disable that HUD while
+ * results are shown — `CategoryPlanDetailController` no longer disables `packScanHud` on trip refresh.
+ *
+ * **Two-line UI:** assign **`categoryPlanDetailBodyText`** to the same `Text` as
+ * `CategoryPlanDetailController.detailBodyText`, and **`packScanDetailText`** on the category controller
+ * to **`packScanResultText`**. Opening **Scan Pack** clears the category line; opening **any category row**
+ * clears the scan line — no overlapping parents, only empty-string swaps.
  */
 @component
 export class PackScanController extends BaseScriptComponent {
@@ -33,7 +41,7 @@ export class PackScanController extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Pinch button that closes the scan session (capture UI only; detail text stays on CategoryDetail_Text).')
+  @hint('Pinch button that closes the scan session (capture UI only; pack result `Text` unchanged).')
   closeButton: PinchButton
 
   @input
@@ -43,13 +51,23 @@ export class PackScanController extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Deprecated — leave unassigned. Pack scan uses `detailBodyText` only (same line as category detail).')
+  @hint('Deprecated — unused for output. Assign `packScanResultText` or `detailBodyText` instead.')
   packHudText: Text
 
   @input
   @allowUndefined
-  @hint('Category detail body (e.g. `CategoryDetail_Text` on `CategoryDetail_Text_Body`). All pack messages + scan results write here.')
+  @hint('Optional dedicated pack scan output (e.g. `ScanDetail_Text_Body`). If set, all pack lines write here only and trip-plan detail clear will not race this `Text`.')
+  packScanResultText: Text
+
+  @input
+  @allowUndefined
+  @hint('Category detail body when not using `packScanResultText` (e.g. `CategoryDetail_Text`).')
   detailBodyText: Text
+
+  @input
+  @allowUndefined
+  @hint('SceneObject to enable before writing `detailBodyText` / `packScanResultText` (e.g. parent card or `PackScanHUD_Placeholder` when the scan text lives under the pack HUD).')
+  categoryDetailPanelRoot: SceneObject
 
   @input
   @allowUndefined
@@ -87,16 +105,47 @@ export class PackScanController extends BaseScriptComponent {
   @hint('Enable PackScanController logs.')
   verboseLogs: boolean = true
 
+  @input
+  @hint('In Lens Studio editor preview, skip VideoController (camera JPEG encode) and use text-only pack — avoids frequent editor native crashes when the scan result appears.')
+  skipCameraEncodeInEditor: boolean = true
+
+  @input
+  @allowUndefined
+  @hint('Same `Text` as CategoryPlanDetailController.detailBodyText (e.g. CategoryDetail_Text). Cleared when Scan Pack opens so only the scan line shows.')
+  categoryPlanDetailBodyText: Text
+
+  @input
+  @allowUndefined
+  @hint('Optional — restores the category panel after **Close** on an open or sending session (no parent disable).')
+  categoryPlanDetailController: CategoryPlanDetailController
+
   private readonly log = new NativeLogger('PackScanController')
   private state: PackScanState = 'idle'
   private pendingCapture: VideoController | null = null
   /** Bumped to cancel in-flight deferred camera preview when session closes or reopens. */
   private previewEnableToken: number = 0
+  /** After idle UI, wait this many Update frames before assigning pack result `Text` (editor-safe). */
+  private packDetailPostIdleFramesRemaining: number = 0
+  private pendingPackDetailBody: string | null = null
+  private packDetailFlushToken: number = 0
+
+  private setPackScanState(next: PackScanState): void {
+    const prev = this.state
+    const lockSharedDetail = !this.packScanResultText && this.geminiAssistant
+    if (lockSharedDetail && prev === 'sending' && next !== 'sending') {
+      this.geminiAssistant.notifyPackScanDetailUiLockExited()
+    }
+    if (lockSharedDetail && prev !== 'sending' && next === 'sending') {
+      this.geminiAssistant.notifyPackScanDetailUiLockEntered()
+    }
+    this.state = next
+  }
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
       this.bindUi()
       this.applyIdleVisibility()
+      this.createEvent('UpdateEvent').bind(() => this.onUpdatePackDetailFlush())
       this.tripLog('PackScanController ready. Pinch Scan Pack to open session; live camera preview follows `showLiveCameraPreview`.')
     })
   }
@@ -125,14 +174,18 @@ export class PackScanController extends BaseScriptComponent {
       return
     }
     try {
-      this.state = 'open'
+      this.clearCategoryPlanDetailBodyForScanSession()
+      this.setPackScanState('open')
       this.applyOpenVisibility()
+      if (this.packScanResultText) {
+        this.setPackDetailBody('Pinch Capture to scan your items, or Close to return to Pack details.')
+      }
       this.tripLog('Scan session opened.')
     } catch (e) {
       this.log.e(`onScanPack failed: ${e}`)
       print(`[PackScanController] onScanPack failed: ${e}`)
       this.previewEnableToken++
-      this.state = 'idle'
+      this.setPackScanState('idle')
       this.applyIdleVisibility()
     }
   }
@@ -151,7 +204,11 @@ export class PackScanController extends BaseScriptComponent {
   }
 
   private onClose(): void {
+    const restoreCategoryPanel = this.state === 'open' || this.state === 'sending'
     this.previewEnableToken++
+    this.packDetailFlushToken++
+    this.pendingPackDetailBody = null
+    this.packDetailPostIdleFramesRemaining = 0
     if (this.pendingCapture) {
       try {
         this.pendingCapture.stopRecording()
@@ -160,8 +217,11 @@ export class PackScanController extends BaseScriptComponent {
       }
       this.pendingCapture = null
     }
-    this.state = 'idle'
+    this.setPackScanState('idle')
     this.applyIdleVisibility()
+    if (restoreCategoryPanel && this.categoryPlanDetailController) {
+      this.categoryPlanDetailController.reapplyLastCategoryDetail()
+    }
     this.tripLog('Scan session closed.')
   }
 
@@ -247,9 +307,15 @@ export class PackScanController extends BaseScriptComponent {
     if (this.state === 'sending') {
       return
     }
-    this.state = 'sending'
+    this.setPackScanState('sending')
     this.applySendingVisibility()
     this.setPackDetailBody('Analyzing your items…')
+
+    if (this.isRunningInLensEditor() && this.skipCameraEncodeInEditor) {
+      this.tripLog('Lens editor: skipCameraEncodeInEditor — text-only pack (no VideoController).')
+      this.submitTextOnly('Editor preview: text-only pack (camera encode skipped). Use device for vision scan.')
+      return
+    }
 
     let video: VideoController
     try {
@@ -334,7 +400,7 @@ export class PackScanController extends BaseScriptComponent {
   }
 
   private submitTextOnly(statusLine: string): void {
-    this.state = 'sending'
+    this.setPackScanState('sending')
     this.applySendingVisibility()
     this.setPackDetailBody(statusLine)
     const prompt = this.buildPackPrompt()
@@ -350,24 +416,76 @@ export class PackScanController extends BaseScriptComponent {
       .then((response) => this.applyResponse(response))
       .catch((error) => {
         this.log.e(`Gemini.models text-only call failed: ${error}`)
-        this.setPackDetailBody('Pack scan failed. Check RSG token and connectivity.')
-        this.state = 'idle'
-        this.applyIdleVisibility()
+        this.finishSendingOnMainThread('Pack scan failed. Check RSG token and connectivity.')
       })
   }
 
   private applyResponse(response: any): void {
     const text = this.extractText(response)
     if (!text || text.length === 0) {
-      this.setPackDetailBody('No scan response. Try again.')
-      this.state = 'idle'
-      this.applyIdleVisibility()
+      this.finishSendingOnMainThread('No scan response. Try again.')
       return
     }
     const compact = text.trim()
-    this.setPackDetailBody(`— Pack —\n\n${compact}`)
-    this.state = 'idle'
-    this.applyIdleVisibility()
+    this.finishSendingOnMainThread(`— Pack —\n\n${compact}`)
+  }
+
+  /**
+   * Apply pack result + idle UI off the Gemini callback, then assign `Text` only after several
+   * **Update** frames (avoids Lens Studio native crashes from chained timers + immediate layout).
+   */
+  private finishSendingOnMainThread(detailBody: string): void {
+    const myFlush = ++this.packDetailFlushToken
+    const ev = this.createEvent('DelayedCallbackEvent')
+    ev.bind(() => {
+      if (myFlush !== this.packDetailFlushToken) {
+        return
+      }
+      if (this.state !== 'sending') {
+        return
+      }
+      this.applyIdleVisibility()
+      if (myFlush !== this.packDetailFlushToken) {
+        return
+      }
+      this.pendingPackDetailBody = detailBody
+      this.packDetailPostIdleFramesRemaining = 4
+    })
+    ev.reset(0.12)
+  }
+
+  private onUpdatePackDetailFlush(): void {
+    if (this.packDetailPostIdleFramesRemaining <= 0) {
+      return
+    }
+    this.packDetailPostIdleFramesRemaining--
+    if (this.packDetailPostIdleFramesRemaining > 0) {
+      return
+    }
+    const body = this.pendingPackDetailBody
+    this.pendingPackDetailBody = null
+    if (this.state !== 'sending' || !body) {
+      return
+    }
+    this.setPackDetailBody(body)
+    this.setPackScanState('idle')
+  }
+
+  private isRunningInLensEditor(): boolean {
+    try {
+      const device = (global as any).deviceInfoSystem
+      return !!(device && device.isEditor && device.isEditor())
+    } catch (_) {
+      return false
+    }
+  }
+
+  private sanitizePackDisplayString(raw: string): string {
+    let s = raw.replace(/\u0000/g, '').replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    s = s.replace(/[\uD800-\uDFFF]/g, '')
+    s = s.replace(/[\uFE00-\uFE0F\u200B-\u200D\uFEFF]/g, '')
+    s = s.replace(/\n{8,}/g, '\n\n\n\n\n\n\n')
+    return s
   }
 
   private buildPackPrompt(): string {
@@ -474,44 +592,133 @@ export class PackScanController extends BaseScriptComponent {
       if (!parts || parts.length === 0) {
         return ''
       }
+      const chunks: string[] = []
       for (let i = 0; i < parts.length; i++) {
         const p = parts[i]
         if (p && typeof p.text === 'string' && p.text.length > 0) {
-          return p.text
+          chunks.push(p.text)
         }
       }
+      return chunks.join('\n')
     } catch (e) {
       this.log.e(`extractText failed: ${e}`)
     }
     return ''
   }
 
-  /**
-   * Category detail `Text` must live on an **enabled** SceneObject; assigning `.text` when the
-   * owner is disabled can hard-crash some Lens Studio / device builds.
-   */
-  private ensureTextSceneObjectEnabled(text: Text): void {
+  /** Walk parents when the API exposes `getParent` (Spectacles / LS); no-op if unsupported. */
+  private tryGetParentSceneObject(so: SceneObject): SceneObject | null {
     try {
+      const fn = (so as any).getParent as undefined | (() => SceneObject | null)
+      if (typeof fn === 'function') {
+        const p = fn.call(so) as SceneObject | null
+        return p || null
+      }
+    } catch (e) {
+      this.log.e(`tryGetParentSceneObject: ${e}`)
+    }
+    return null
+  }
+
+  /**
+   * If the pack output `Text` sits under **`packScanHud`**, the HUD root must stay enabled for
+   * `.text` updates — otherwise native builds crash (trip-plan `clearDetail` used to disable this HUD).
+   */
+  private ensurePackScanHudEnabledForOwnerOf(text: Text): void {
+    if (!this.packScanHud) {
+      return
+    }
+    try {
+      let cur: SceneObject | null = text.getSceneObject()
+      let depth = 0
+      while (cur && depth < 24) {
+        if (cur === this.packScanHud) {
+          if (!this.packScanHud.enabled) {
+            this.packScanHud.enabled = true
+          }
+          return
+        }
+        cur = this.tryGetParentSceneObject(cur)
+        depth++
+      }
+    } catch (e) {
+      this.log.e(`ensurePackScanHudEnabledForOwnerOf: ${e}`)
+    }
+  }
+
+  /**
+   * Enable configured panel root + the `Text` owner only. (Walking every parent via `getParent`
+   * and toggling nodes caused instability in Lens Studio when pack copy appeared.)
+   */
+  private ensureCategoryDetailTextWritable(text: Text): void {
+    try {
+      if (this.categoryDetailPanelRoot && !this.categoryDetailPanelRoot.enabled) {
+        this.categoryDetailPanelRoot.enabled = true
+      }
       const owner = text.getSceneObject()
       if (owner && !owner.enabled) {
         owner.enabled = true
       }
     } catch (e) {
-      this.log.e(`ensureTextSceneObjectEnabled: ${e}`)
+      this.log.e(`ensureCategoryDetailTextWritable: ${e}`)
     }
   }
 
-  /** Pack scan status + results: always `detailBodyText` (same as category detail). */
-  private setPackDetailBody(message: string): void {
-    const target = this.detailBodyText || this.packHudText
-    if (!target) {
-      this.log.e('PackScanController: assign detailBodyText (CategoryDetail_Text).')
-      print('[PackScanController] Assign detailBodyText (CategoryDetail_Text on CategoryDetail_Text_Body).')
+  /** Same ancestor walk as `CategoryPlanDetailController.ensureDetailTextOwnerEnabled` — safe before `.text = ''`. */
+  private ensureTextAncestorsEnabledForWrite(text: Text): void {
+    let cur: SceneObject | null = null
+    try {
+      cur = text.getSceneObject()
+    } catch (e) {
+      this.log.e(`ensureTextAncestorsEnabledForWrite getSceneObject: ${e}`)
       return
     }
-    this.ensureTextSceneObjectEnabled(target)
+    let depth = 0
+    while (cur && depth < 20) {
+      try {
+        if (!cur.enabled) {
+          cur.enabled = true
+        }
+      } catch (e) {
+        this.log.e(`ensureTextAncestorsEnabledForWrite: ${e}`)
+        break
+      }
+      cur = this.tryGetParentSceneObject(cur)
+      depth++
+    }
+  }
+
+  private clearCategoryPlanDetailBodyForScanSession(): void {
+    if (!this.categoryPlanDetailBodyText) {
+      return
+    }
+    this.ensureTextAncestorsEnabledForWrite(this.categoryPlanDetailBodyText)
     try {
-      target.text = message
+      this.categoryPlanDetailBodyText.text = ''
+    } catch (e) {
+      this.log.e(`clearCategoryPlanDetailBodyForScanSession: ${e}`)
+    }
+  }
+
+  /** Pack scan status + results: `packScanResultText` if set, else `detailBodyText` only. */
+  private setPackDetailBody(message: string): void {
+    const maxLen = this.isRunningInLensEditor() ? 6000 : 12000
+    let safe = this.sanitizePackDisplayString(message)
+    if (safe.length > maxLen) {
+      safe = `${safe.substring(0, maxLen)}\n\n…(truncated for display)`
+    }
+    const target = this.packScanResultText || this.detailBodyText
+    if (!target) {
+      this.log.e(
+        'PackScanController: assign packScanResultText (recommended) or detailBodyText. packHudText is unused.',
+      )
+      print('[PackScanController] Assign packScanResultText (e.g. Text on ScanDetail_Text_Body) or detailBodyText.')
+      return
+    }
+    this.ensurePackScanHudEnabledForOwnerOf(target)
+    this.ensureCategoryDetailTextWritable(target)
+    try {
+      target.text = safe
     } catch (e) {
       this.log.e(`setPackDetailBody failed: ${e}`)
       print(`[PackScanController] setPackDetailBody failed: ${e}`)

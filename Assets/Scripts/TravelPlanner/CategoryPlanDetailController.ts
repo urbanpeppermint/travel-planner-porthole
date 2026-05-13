@@ -13,8 +13,13 @@ import {
  * Makes each category row (SceneObject with SIK **Interactable** + collider) open a **beta detail** panel.
  * Row order must match `geminiAssistant.getPlanningCategoriesResolved()` (transport → accommodation → …).
  *
- * **Pack**: enables `packScanHud` when the Pack row is opened. Copy is user-facing; wiring notes
- * belong in `SCENE_SETUP.md` / Logger only.
+ * **Pack**: enables `packScanHud` when the Pack row is opened; **disables** it when any **non-pack**
+ * category row is opened. Trip-plan refresh clears **`detailBodyText` only** — it does **not**
+ * toggle `packScanHud` (pack HUD may host `ScanDetail_Text` under the same root).
+ *
+ * When **`packScanDetailText`** is set (e.g. `ScanDetail_Text_Body`), opening **any** category row
+ * clears it so only **`detailBodyText`** shows — avoids overlapping two full-height panels without
+ * disabling parents (which can crash when code still assigns `.text`).
  */
 @component
 export class CategoryPlanDetailController extends BaseScriptComponent {
@@ -40,6 +45,14 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
   @allowUndefined
   @hint('Optional: show a HUD object when Pack is opened (e.g. camera preview placeholder).')
   packScanHud: SceneObject
+
+  @input
+  @allowUndefined
+  @hint('Pack vision / status line (e.g. ScanDetail_Text_Body). Cleared when any category row opens so it does not overlap detailBodyText.')
+  packScanDetailText: Text
+
+  /** Last row the user opened — used to restore Pack copy after a cancelled Scan Pack session. */
+  private lastOpenedCategory: TripPlanningCategory | null = null
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -78,26 +91,102 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
   }
 
   private openCategoryDetail(category: TripPlanningCategory): void {
+    this.lastOpenedCategory = category
     const draft = this.geminiAssistant ? this.geminiAssistant.getTripDraft() : null
     const plan = this.geminiAssistant ? this.geminiAssistant.getLastTripPlan() : null
     const body = this.buildDetailBody(category, draft, plan)
     this.setDetail(body)
-    if (category === 'pack' && this.packScanHud) {
-      this.packScanHud.enabled = true
+    if (this.packScanHud) {
+      this.packScanHud.enabled = category === 'pack'
+    }
+    if (this.packScanDetailText) {
+      this.clearTextSafe(this.packScanDetailText)
+    }
+  }
+
+  /**
+   * Rebuilds the last opened category panel (e.g. after Scan Pack **Close** without a finished result).
+   * Safe to call from `PackScanController` when optional wiring is present.
+   */
+  reapplyLastCategoryDetail(): void {
+    if (this.lastOpenedCategory !== null) {
+      this.openCategoryDetail(this.lastOpenedCategory)
     }
   }
 
   private clearDetail(): void {
-    if (this.packScanHud) {
-      this.packScanHud.enabled = false
+    if (this.geminiAssistant && this.geminiAssistant.isPackScanDetailUiLocked()) {
+      return
     }
+    this.clearDetailNow()
+  }
+
+  private clearDetailNow(): void {
     this.setDetail('')
   }
 
   private setDetail(msg: string): void {
-    if (this.detailBodyText) {
-      this.detailBodyText.text = msg
+    if (!this.detailBodyText) {
+      return
     }
+    this.ensureDetailTextOwnerEnabled(this.detailBodyText)
+    try {
+      this.detailBodyText.text = msg
+    } catch (e) {
+      print(`[CategoryPlanDetailController] setDetail failed: ${e}`)
+    }
+  }
+
+  private clearTextSafe(text: Text): void {
+    if (!text) {
+      return
+    }
+    this.ensureDetailTextOwnerEnabled(text)
+    try {
+      text.text = ''
+    } catch (e) {
+      print(`[CategoryPlanDetailController] clearTextSafe failed: ${e}`)
+    }
+  }
+
+  /**
+   * Same guard as `PackScanController`: assigning `.text` while any ancestor is disabled can
+   * hard-crash some Spectacles builds.
+   */
+  private ensureDetailTextOwnerEnabled(text: Text): void {
+    let cur: SceneObject | null = null
+    try {
+      cur = text.getSceneObject()
+    } catch (e) {
+      print(`[CategoryPlanDetailController] ensureDetailTextOwnerEnabled getSceneObject: ${e}`)
+      return
+    }
+    let depth = 0
+    while (cur && depth < 20) {
+      try {
+        if (!cur.enabled) {
+          cur.enabled = true
+        }
+      } catch (e) {
+        print(`[CategoryPlanDetailController] ensureDetailTextOwnerEnabled enable: ${e}`)
+        break
+      }
+      cur = this.tryGetParentSceneObject(cur)
+      depth++
+    }
+  }
+
+  private tryGetParentSceneObject(so: SceneObject): SceneObject | null {
+    try {
+      const fn = (so as any).getParent as undefined | (() => SceneObject | null)
+      if (typeof fn === 'function') {
+        const p = fn.call(so) as SceneObject | null
+        return p || null
+      }
+    } catch (_) {
+      /* getParent unsupported */
+    }
+    return null
   }
 
   private buildDetailBody(
@@ -138,14 +227,20 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
     return lines.join('\n')
   }
 
-  /** Model sometimes prints "from 0400" without € — normalize for on-lens readability. */
+  /** Model sometimes prints bare numbers or "from 0400" without € — normalize for on-lens readability. */
   private prettifyModelPriceHint(raw: string): string {
     if (!raw || raw.length === 0) {
       return raw
     }
-    let s = raw
-    if (!/[€$£¥]/.test(s)) {
-      s = s.replace(/\b(from|around|~|approx\.?)\s+0+(\d{2,5})\b/gi, (_m, p, n) => `${p} €${parseInt(n, 10)}`)
+    let s = raw.trim()
+    const hasSym = /[€$£¥]/.test(s)
+    if (!hasSym) {
+      s = s.replace(/\b(from|around|~|approx\.?)\s+0*(\d{2,5})\b/gi, (_m, p, n) => `${p} €${parseInt(n, 10)}`)
+      if (/^\d{2,5}$/.test(s)) {
+        s = `€${parseInt(s, 10)}`
+      } else {
+        s = s.replace(/\b(\d{3,5})\s*(?:\/|\s+per\s+)\s*night\b/gi, (_, n) => `€${parseInt(n, 10)} / night`)
+      }
     } else {
       s = s.replace(/\b(from|around|~|approx\.?)\s+0+(\d{2,5})\b/gi, (_m, p, n) => `${p} ${parseInt(n, 10)}`)
     }
@@ -360,7 +455,9 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
     const out: string[] = []
     out.push('Packed items')
     out.push('')
-    out.push('Pinch Scan Pack in the HUD to open the session; status and results appear in this panel (same text as other categories). Use Capture when ready.')
+    out.push(
+      'Pinch Scan Pack in the HUD to open a session; status and vision results appear on the scan line above. Tap Capture when ready.',
+    )
     if (card && card.options && card.options.length > 0) {
       out.push('')
       out.push('Suggested items from plan:')

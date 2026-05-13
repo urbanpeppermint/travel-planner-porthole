@@ -26,6 +26,8 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    autoResumeDelaySec: false
+    autoResumeListeningAfterUtterance: false
     hintEchoText: false
     statusText: false
   ScriptTypesHidden:
@@ -39,9 +41,13 @@
   DefaultScriptInputs:
     - statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       hintEchoText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      autoResumeListeningAfterUtterance: true
+      autoResumeDelaySec: 0.280000
   ScriptTypes:
     -
       {}
   InputLines:
     - '// @input Component.Text statusText {"hint":"Optional text field for listening/error status."}'
     - '// @input Component.Text hintEchoText {"hint":"Optional second line (e.g. VoiceHint) mirrored with listening/errors."}'
+    - '// @input bool autoResumeListeningAfterUtterance = true {"hint":"After a final transcript is processed, start listening again without pinching Voice Mode."}'
+    - '// @input float autoResumeDelaySec = 0.28 {"hint":"Seconds to wait before reopening the mic (lets ASR + UI settle)."}'

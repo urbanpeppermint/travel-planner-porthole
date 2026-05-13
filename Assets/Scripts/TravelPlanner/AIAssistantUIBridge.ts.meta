@@ -69,7 +69,7 @@
   InputLines:
     - '// @input AssignableType geminiAssistant {"hint":"Primary trip assistant."}'
     - '// @input AssignableType_1 asrQueryController {"hint":"Optional ASR controller that emits user speech transcripts."}'
-    - '// @input AssignableType_2 startAssistantButton {"hint":"Voice Mode PinchButton: welcome + listen/stop; bridge auto-restarts listening after each transcript (pinch again to stop)."}'
+    - '// @input AssignableType_2 startAssistantButton {"hint":"Voice capture: assign PinchButton under Btn_VoiceMode_Placeholder. Pinch = welcome (once) + start/stop speech-to-text."}'
     - '// @input AssignableType_3 micMuteToggle {"hint":"SIK Toggle on Btn_Mic: ON = muted (blocks capture), OFF = unmuted. Does not start STT."}'
     - '// @input AssignableType_4 planTripButton {"hint":"Button to submit current captured trip draft to Gemini."}'
     - '// @input Component.Text hintText {"hint":"Optional hint line for setup/debug status."}'

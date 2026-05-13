@@ -16,7 +16,7 @@ Only these three purpose labels are supported now:
 - `Bleisure`
 
 ### Bottom buttons (recommended wiring)
-- **Voice Mode pinch** → `AIAssistantUIBridge.startAssistantButton` — runs `beginAssistantSessionFromContext()` **and** `ASRQueryController.toggleRecording()` (listen ↔ stop). After each **final** ASR transcript, the bridge **starts listening again** after a short delay so the user usually does **not** need a second pinch between intake turns (pinch again to stop or to cancel a pending auto-listen). No PinchButton on `ASRQueryController` anymore (avoids dead refs / double subscriptions).
+- **Voice Mode pinch** → `AIAssistantUIBridge.startAssistantButton` — runs `beginAssistantSessionFromContext()` **and** `ASRQueryController.toggleRecording()` on every pinch (listen ↔ stop). **`ASRQueryController`** defaults to **auto-resume listening** after each final transcript (and again after a successful **Plan trip**), so users can say the next line (e.g. “plan my trip”) **without** pinching Voice Mode again unless the mic was muted or a plan request just started. Turn **`autoResumeListeningAfterUtterance`** off on `ASRQueryController` to restore old pinch-each-time behavior.
 - **Mic mute (SIK Toggle on Btn_Mic)** → `AIAssistantUIBridge.micMuteToggle` — toggles mute inside `ASRQueryController` (`toggleMicMuted()`). **ON = muted.** It does **not** start STT; use **Voice Mode** pinch for capture.
 - **Plan Trip button** → `AIAssistantUIBridge.planTripButton`
 - **Keyboard pinch** → `AIAssistantUIBridge.keyboardToggleButton`
@@ -84,14 +84,15 @@ Pack scan uses **`PackScanController`**: **Scan Pack** → session with **Captur
 **Camera texture:** Wire **`originalCameraTexture`** to any device camera feed (Crop package **Device Camera Texture** is fine for capture-only; the Crop prefab UI can stay disabled / unassigned on `cameraPreviewRoot`). Optional: **`weatherAccuBridge`** for richer “Suggested additions” using the AccuWeather summary.
 
 **Two trigger points** for Pack details:
-- Pinch **Scan Pack** → opens a session in `PackScanController`.
-- Tap the **Pack category title** → `CategoryPlanDetailController` opens the HUD + detail panel; shows the last scan result without starting a new scan.
+- Pinch **Scan Pack** → opens a session in `PackScanController` (category line clears; scan line only).
+- Tap the **Pack category title** → `CategoryPlanDetailController` opens the HUD + fills the category detail line; the scan line clears until you start a new scan.
 
 **Scene setup:**
 
 1. **Capture feed:** Assign **`originalCameraTexture`** (Crop package device texture or your camera output).
 2. **Camera preview (recommended):** Assign **`cameraPreviewRoot`** to your preview root (e.g. `CropCameraTextureTS`). Keep **`showLiveCameraPreview`** on (default) so it shows during the session.
 3. Add **PinchButtons**: `Btn_Capture_Pack`, `Btn_Close_Pack` (and existing `Btn_Scan_Pack`).
+4. **No overlapping Pack texts:** On **`PackScanController`**, assign **`categoryPlanDetailBodyText`** to the **same** `Text` as **`CategoryPlanDetailController.detailBodyText`**, and **`categoryPlanDetailController`** to that **`CategoryPlanDetailController`** component. On **`CategoryPlanDetailController`**, assign **`packScanDetailText`** to the **same** `Text` as **`PackScanController.packScanResultText`** (e.g. `ScanDetail_Text_Body`). Scripts swap **empty string** on the hidden line only (parents stay enabled).
 
 **`PackScanController` inputs:**
 
@@ -103,15 +104,28 @@ Pack scan uses **`PackScanController`**: **Scan Pack** → session with **Captur
 | `captureButton` | `Btn_Capture_Pack` |
 | `closeButton` | `Btn_Close_Pack` |
 | `packScanHud` | `PackScanHUD_Placeholder` |
-| `packHudText` | **Leave empty** (deprecated). |
-| `detailBodyText` | **`CategoryDetail_Text`** on **`CategoryDetail_Text_Body`** — pack status, “Analyzing…”, and scan results all write here (same panel as category beta copy). |
+| `packHudText` | **Leave empty** (deprecated / unused). |
+| `packScanResultText` | **Recommended:** `Text` on **`ScanDetail_Text_Body`** (child of pack HUD). All pack lines write here — avoids sharing `Text` with category detail. |
+| `detailBodyText` | Use only if `packScanResultText` is empty — then same rules as category detail (`CategoryDetail_Text`). |
+| `categoryDetailPanelRoot` | Object to enable before writes — use **`PackScanHUD_Placeholder`** when `packScanResultText` lives under that HUD; otherwise **`CategoryDetailCard_Placeholder`**. |
 | `observedItemsText` | optional typed list `Text` |
 | `cameraPreviewRoot` | optional; only used when **`showLiveCameraPreview`** is on |
 | `originalCameraTexture` | device / package camera texture for JPEG snapshot |
+| `categoryPlanDetailBodyText` | **Same** `Text` as `CategoryPlanDetailController` → `detailBodyText` (e.g. `CategoryDetail_Text`). Cleared when Scan Pack opens. |
+| `categoryPlanDetailController` | **Same** `CategoryPlanDetailController` instance — restores that panel after **Close** while session was open or sending. |
+| `skipCameraEncodeInEditor` | default **on** — editor text-only pack (see note below) |
 
-**Note:** The `Text` component must sit on an **enabled** SceneObject; a disabled parent + `.text` updates can crash the lens.
+**`CategoryPlanDetailController` (Pack overlap):**
 
-**Runtime:** Open Pack row → pinch Scan Pack → Capture sends one frame to Gemini Vision. **Close** only hides capture UI; scan copy stays on **`CategoryDetail_Text`** until the next category tap or new scan.
+| Input | Wire to |
+|---|---|
+| `packScanDetailText` | **Same** `Text` as `PackScanController.packScanResultText` (e.g. `ScanDetail_Text_Body`). Cleared when **any** category row opens. |
+
+**Note:** Do **not** disable **`packScanHUD_Placeholder`** while writing pack result `Text` that is parented under it — that was a common native crash when **`onTripPlanReady`** cleared detail and toggled the HUD off mid-scan. **`CategoryPlanDetailController`** now clears **`detailBodyText` only** and hides the pack HUD when you open a **non-pack** category row. Pack scan re-enables the HUD before each `.text` write if needed. The final pack line is still applied on a short delay off the Gemini callback.
+
+**Lens Studio editor:** set **`ShowEditingPreview: false`** on pack result `Text` if the editor still crashes on layout. **`skipCameraEncodeInEditor`** (default **on**) skips **`VideoController`** in the editor and uses **text-only** pack (device still runs vision when this is on — editor detection is runtime-only). Turn **`skipCameraEncodeInEditor`** off only if you need to debug camera encode **in the desktop preview** (higher crash risk).
+
+**Runtime:** Open Pack row → pinch Scan Pack → Capture sends one frame to Gemini Vision. **Close** hides capture UI; with **`categoryPlanDetailController`** wired, it also refills the last category line and clears the scan line. A finished scan keeps the result on **`packScanResultText`** until you open another category row or start a new scan.
 
 **Important:** Use **exactly one** `PackScanController` in the scene wired to **Scan / Capture / Close** and **`cameraPreviewRoot`**. A second copy on the same pinch handlers will fight the first (preview stuck off, double state). Disable or remove duplicate components.
 
