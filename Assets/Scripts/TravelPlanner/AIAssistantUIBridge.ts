@@ -298,7 +298,11 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
       if (this.asrQueryController.getIsRecording()) {
         return
       }
-      this.asrQueryController.toggleRecording()
+      try {
+        this.asrQueryController.toggleRecording()
+      } catch (e) {
+        print(`[AIAssistantUIBridge] scheduleResumeVoiceListening: toggleRecording failed: ${e}`)
+      }
     })
     delayed.reset(delaySec)
   }
