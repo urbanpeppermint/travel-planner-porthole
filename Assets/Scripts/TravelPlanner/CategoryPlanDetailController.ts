@@ -13,7 +13,8 @@ import {
  * Makes each category row (SceneObject with SIK **Interactable** + collider) open a **beta detail** panel.
  * Row order must match `geminiAssistant.getPlanningCategoriesResolved()` (transport → accommodation → …).
  *
- * **Pack**: enables `packScanHud` and explains device-camera / Gemini-vision wiring (placeholder until you add ML).
+ * **Pack**: enables `packScanHud` when the Pack row is opened. Copy is user-facing; wiring notes
+ * belong in `SCENE_SETUP.md` / Logger only.
  */
 @component
 export class CategoryPlanDetailController extends BaseScriptComponent {
@@ -106,7 +107,9 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
   ): string {
     const card = plan && plan.cards ? plan.cards[category] : undefined
     const lines: string[] = []
-    lines.push(`— ${this.capitalize(category)} (beta) —`)
+    const title =
+      category === 'pack' ? `— ${this.capitalize(category)} —` : `— ${this.capitalize(category)} (beta) —`
+    lines.push(title)
     lines.push('')
 
     switch (category) {
@@ -135,6 +138,20 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
     return lines.join('\n')
   }
 
+  /** Model sometimes prints "from 0400" without € — normalize for on-lens readability. */
+  private prettifyModelPriceHint(raw: string): string {
+    if (!raw || raw.length === 0) {
+      return raw
+    }
+    let s = raw
+    if (!/[€$£¥]/.test(s)) {
+      s = s.replace(/\b(from|around|~|approx\.?)\s+0+(\d{2,5})\b/gi, (_m, p, n) => `${p} €${parseInt(n, 10)}`)
+    } else {
+      s = s.replace(/\b(from|around|~|approx\.?)\s+0+(\d{2,5})\b/gi, (_m, p, n) => `${p} ${parseInt(n, 10)}`)
+    }
+    return s
+  }
+
   private formatAccommodation(card: CategoryCardData | undefined, draft: TripDraft | null): string[] {
     const out: string[] = []
     const hasDates = !!(draft && draft.departureDateTime && draft.arrivalDateTime)
@@ -146,26 +163,32 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
       return out
     }
     out.push('Example (no model rows yet):')
-    out.push(`Source: booking.com`)
+    out.push('Compare rates: Google Hotels · Trivago · Kayak Hotels')
     out.push(`Stay: Hotel near ${draft && draft.destinationCity ? draft.destinationCity : 'destination'}`)
     out.push(hasDates ? 'Price: from €X / night · full stay estimate when dates confirmed' : 'Price: from €X / night (add trip dates for stay total)')
     return out
   }
 
   private formatOneAccommodation(o: CategoryOption, index: number, hasDates: boolean): string[] {
-    const site = o.sourceSite || o.provider || 'booking.com (example)'
     const title = o.title || 'Hotel option'
     const line: string[] = []
     line.push(`Option ${index}`)
-    line.push(`Source: ${site}`)
+    if (o.sourceSite && o.sourceSite.length > 0) {
+      line.push(`Compare / book via: ${o.sourceSite}`)
+    }
+    if (o.provider && o.provider.length > 0 && o.provider !== o.sourceSite) {
+      line.push(`Chain / property: ${o.provider}`)
+    } else if (!o.sourceSite || o.sourceSite.length === 0) {
+      line.push(`Source: ${o.provider || 'OTA / hotel site'}`)
+    }
     line.push(`Stay: ${title}`)
     if (o.pricePerNight) {
-      line.push(`Per night: ${o.pricePerNight}`)
+      line.push(`Per night: ${this.prettifyModelPriceHint(o.pricePerNight)}`)
     }
     if (hasDates && o.totalStayPrice) {
-      line.push(`Full stay (with your dates): ${o.totalStayPrice}`)
+      line.push(`Full stay (with your dates): ${this.prettifyModelPriceHint(o.totalStayPrice)}`)
     } else if (o.price) {
-      line.push(`Price: ${o.price}`)
+      line.push(`Price: ${this.prettifyModelPriceHint(o.price)}`)
     }
     if (o.bookingProductUrl) {
       line.push(`Link: ${o.bookingProductUrl}`)
@@ -205,13 +228,20 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
   private formatOneTransport(o: CategoryOption, index: number, showLegs: boolean, draft: TripDraft | null): string[] {
     const line: string[] = []
     line.push(`Option ${index}`)
-    line.push(`Source: ${o.sourceSite || o.provider || 'Skyscanner (example)'}`)
+    if (o.sourceSite && o.sourceSite.length > 0) {
+      line.push(`Compare / book via: ${o.sourceSite}`)
+    }
+    if (o.provider && o.provider.length > 0 && o.provider !== o.sourceSite) {
+      line.push(`Provider / airline: ${o.provider}`)
+    } else if (!o.sourceSite || o.sourceSite.length === 0) {
+      line.push(`Source: ${o.provider || 'price comparison site'}`)
+    }
     if (o.airline) {
       line.push(`Airline: ${o.airline}`)
     }
     line.push(`Offer: ${o.title}`)
     if (o.price) {
-      line.push(`Best price: ${o.price}`)
+      line.push(`Best price: ${this.prettifyModelPriceHint(o.price)}`)
     }
     if (showLegs) {
       if (o.outboundSummary) {
@@ -227,6 +257,9 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
     }
     if (o.bookingProductUrl) {
       line.push(`Book: ${o.bookingProductUrl}`)
+    }
+    if (o.ticketUrl) {
+      line.push(`Search link: ${o.ticketUrl}`)
     }
     if (o.notes) {
       line.push(`Note: ${o.notes}`)
@@ -325,15 +358,9 @@ export class CategoryPlanDetailController extends BaseScriptComponent {
 
   private formatPack(card: CategoryCardData | undefined, draft: TripDraft | null): string[] {
     const out: string[] = []
-    out.push('Pack & luggage (beta)')
+    out.push('Packed items')
     out.push('')
-    out.push(
-      'AI vision: point Spectacles / device camera at your bag and send a frame to Gemini multimodal (or ML classification) — not wired in this template.',
-    )
-    if (this.packScanHud) {
-      out.push('')
-      out.push('HUD: enabled — assign a live camera texture + capture button in Lens Studio.')
-    }
+    out.push('Pinch Scan Pack in the HUD to open the session; status and results appear in this panel (same text as other categories). Use Capture when ready.')
     if (card && card.options && card.options.length > 0) {
       out.push('')
       out.push('Suggested items from plan:')

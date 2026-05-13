@@ -14,6 +14,11 @@ import { TripDraft, TripPlanResponse, TripPlanningCategory, TripPurpose } from '
  *
  * Call `beginAssistantSession()` once the mic experience starts, then feed user transcripts to
  * `handleSpeechTranscript()`. When all required fields are captured, call `requestTripPlan()`.
+ *
+ * **Voice → trip fields:** Parsed with **deterministic phrase + regex rules** on the ASR string
+ * (same language path as the mic). **Gemini is not** re-interpreted on every utterance — only
+ * `requestTripPlan()` calls Gemini once the draft is filled. Improve fluency by extending parsers
+ * here rather than expecting live Gemini on raw speech.
  */
 @component
 export class GeminiAssistant extends BaseScriptComponent {
@@ -60,6 +65,20 @@ export class GeminiAssistant extends BaseScriptComponent {
     'saturday',
     'sun',
     'sunday',
+  ])
+
+  /** Single-token captures that are never valid calendar values (regex / ASR glitches). */
+  private static readonly SPEECH_DATE_NOISE_WORDS = new Set<string>([
+    'month',
+    'week',
+    'year',
+    'day',
+    'time',
+    'date',
+    'the',
+    'end',
+    'next',
+    'last',
   ])
 
   @input
@@ -300,6 +319,41 @@ export class GeminiAssistant extends BaseScriptComponent {
     return this.tripDraft
   }
 
+  /**
+   * Stable trip labels for auxiliary prompts (e.g. Pack scan) before `requestTripPlan()`.
+   * Departure: draft → detected user city → `fallbackDepartureCity`. Destination: draft,
+   * or mirrors departure when `defaultDestinationToCurrentCity`, else same fallbacks.
+   * Dates use localized fallback when empty.
+   */
+  resolveTripSurfaceForPackScan(): TripDraft {
+    const fb =
+      this.fallbackDepartureCity && this.fallbackDepartureCity.trim().length > 0
+        ? this.fallbackDepartureCity.trim()
+        : 'Berlin'
+    const detected = this.detectedDepartureCity ? this.detectedDepartureCity.trim() : ''
+    let dep = this.tripDraft.departureCity.trim()
+    if (!dep) {
+      dep = detected.length > 0 ? detected : fb
+    }
+    let dest = this.tripDraft.destinationCity.trim()
+    if (!dest && this.defaultDestinationToCurrentCity) {
+      dest = dep.length > 0 ? dep : fb
+    }
+    if (!dest) {
+      dest = fb
+    }
+    const dateFb = this.getLocalizedDateFallback()
+    return {
+      departureCity: dep,
+      destinationCity: dest,
+      departureDateTime: this.tripDraft.departureDateTime.trim() || dateFb,
+      arrivalDateTime: this.tripDraft.arrivalDateTime.trim() || dateFb,
+      purpose: this.tripDraft.purpose,
+      skipLongDistanceTransport: this.tripDraft.skipLongDistanceTransport,
+      voicePreferenceNotes: this.tripDraft.voicePreferenceNotes,
+    }
+  }
+
   /** Last successful `requestTripPlan` parse — used by category detail UI. */
   getLastTripPlan(): TripPlanResponse | null {
     return this.lastTripPlan
@@ -487,7 +541,7 @@ export class GeminiAssistant extends BaseScriptComponent {
   private extractTripFields(transcript: string): void {
     const loweredRaw = transcript.toLowerCase()
     this.applyExplicitCurrentLocationPhrases(loweredRaw)
-    const lowered = this.expandHereAliasesInCityPhrases(loweredRaw)
+    const lowered = this.normalizeVoiceDateTokens(this.expandHereAliasesInCityPhrases(loweredRaw))
 
     const cityPair = this.extractCityPairFromFreeform(lowered)
     if (cityPair) {
@@ -541,6 +595,12 @@ export class GeminiAssistant extends BaseScriptComponent {
       }
     }
 
+    const fluentEndMonth = this.extractFluentUntilEndOfMonth(lowered)
+    if (fluentEndMonth) {
+      this.tripDraft.departureDateTime = fluentEndMonth.depart
+      this.tripDraft.arrivalDateTime = fluentEndMonth.arrive
+    }
+
     const purpose = this.extractPurpose(lowered)
     if (purpose !== '') {
       this.tripDraft.purpose = purpose
@@ -565,6 +625,8 @@ export class GeminiAssistant extends BaseScriptComponent {
     if (loc && this.tripDraft.departureCity.toLowerCase() === 'here') {
       this.tripDraft.departureCity = loc
     }
+
+    this.stripGarbageDateFields()
   }
 
   /** User said "use my current location" etc. — map departure to Lens-detected / fallback city. */
@@ -788,6 +850,15 @@ export class GeminiAssistant extends BaseScriptComponent {
     }
   }
 
+  /** Converts "may 13th" / "13 may" style chunks to dd/mm/yyyy using the current calendar year. */
+  private parseSpokenMonthDayPair(monthTok: string, dayNum: number): string {
+    const mi = this.monthAbbrToIndex(monthTok)
+    if (mi < 0 || dayNum < 1 || dayNum > 31) {
+      return ''
+    }
+    return this.monthDayToTripFormat(mi, dayNum)
+  }
+
   private extractDateRangeFromFreeform(text: string): { depart: string; arrive: string } | null {
     const numeric = text.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*(?:to|-|until)\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/)
     if (numeric && numeric.length >= 3) {
@@ -795,11 +866,29 @@ export class GeminiAssistant extends BaseScriptComponent {
     }
 
     const monthRange = text.match(
-      /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?)\s*(?:to|-|until)\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?)/,
+      /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\s+(\d{1,2})(?:st|nd|rd|th)?\s*(?:to|-|until)\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\s+(\d{1,2})(?:st|nd|rd|th)?/,
     )
-    if (monthRange && monthRange.length >= 3) {
-      return { depart: monthRange[1], arrive: monthRange[2] }
+    if (monthRange && monthRange.length >= 5) {
+      const d0 = parseInt(monthRange[2], 10)
+      const d1 = parseInt(monthRange[4], 10)
+      const a = this.parseSpokenMonthDayPair(monthRange[1], d0)
+      const b = this.parseSpokenMonthDayPair(monthRange[3], d1)
+      if (a && b) {
+        return { depart: a, arrive: b }
+      }
     }
+
+    const dayFirst = text.match(
+      /\b(\d{1,2})(?:st|nd|rd|th)?\s+((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\s*(?:to|-|until)\s*(\d{1,2})(?:st|nd|rd|th)?\s+((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\b/,
+    )
+    if (dayFirst && dayFirst.length >= 5) {
+      const a = this.parseSpokenMonthDayPair(dayFirst[2], parseInt(dayFirst[1], 10))
+      const b = this.parseSpokenMonthDayPair(dayFirst[4], parseInt(dayFirst[3], 10))
+      if (a && b) {
+        return { depart: a, arrive: b }
+      }
+    }
+
     return null
   }
 
@@ -915,8 +1004,18 @@ export class GeminiAssistant extends BaseScriptComponent {
       '  }',
       '}',
       'Categories must be chosen from: transportation, accommodation, places, restaurants, weather, pack.',
-      'For accommodation: prefer sourceSite like booking.com, pricePerNight and totalStayPrice when trip dates exist. bookingProductUrl / ticketUrl must be plausible public URLs or omitted — do not invent paths like /hotel/may/ or other nonsense tokens.',
-      'For transportation: airline, outboundSummary/inboundSummary when cities+dates known; else local transit. If voicePreferenceNotes mention shortest/cheapest/direct, reflect that in titles and notes (do not fabricate exact fares).',
+      'For accommodation when trip dates exist:',
+      '  - Include a **mix of price tiers**: at least one **value or solid mid-range** hotel (well-reviewed, good neighborhood) and avoid listing only luxury 5-star properties unless purpose is business and voicePreferenceNotes clearly imply upscale stays.',
+      '  - Include at least one **hotel price-comparison** option: set sourceSite to "Google Hotels", "Trivago", "Kayak Hotels", or "HotelsCombined", title like "Compare hotel rates in the destination city" using the draft dates, notes that users compare chains and OTAs for lower nightly rates.',
+      '  - Spread other stays across realistic OTAs in sourceSite — e.g. booking.com, Agoda, Hotels.com, Expedia — not the same ultra-premium positioning for every row.',
+      '  - Use pricePerNight and totalStayPrice only as **broad indicative ranges** — when you include a number, **prefix a real currency symbol** (€, $, £, or JP¥) and avoid leading zeros (write "€400" not "0400"). Say "typical range" in words; never invent live rack rates. bookingProductUrl only when plausible public URLs; otherwise omit.',
+      'For transportation when departureCity differs from destinationCity AND skipLongDistanceTransport is false (long-haul / international):',
+      '  - Include at least one option aimed at **price comparison**: set sourceSite to "Skyscanner" or "Google Flights" or "Kayak", title like "Compare Rome → Tokyo flights" using the draft dates, notes explaining user compares airlines and times there — do not invent obscure airline brands (e.g. avoid fake names like "National Airways") as the only booking path.',
+      '  - When both departure and return dates exist in the draft, at least one transportation option must frame **round-trip / return-included** search in title or notes and state that **round-trip tickets are usually much cheaper than buying two separate one-way tickets**; do not present two one-ways as the default cheapest path.',
+      '  - Add 1–2 additional options naming **real** major carriers that commonly serve similar routes (e.g. ITA Airways, JAL, ANA, Lufthansa, Air France) as examples in title/notes/airline; price may be qualitative with a **currency symbol** (e.g. "from €800 typical round-trip range") or omitted — never fake live fares or use naked numbers with leading zeros.',
+      '  - Prefer ticketUrl only for well-known public flight-search URLs; if unsure, omit ticketUrl and keep sourceSite + notes.',
+      'For transportation when cities match, skipLongDistanceTransport is true, or dates missing: local transit / trains / day trips only.',
+      'If voicePreferenceNotes mention shortest/cheapest/direct, reflect that in transportation titles and notes.',
       'For places: ticketUrl and/or ticketOfficeHint for ticket purchase.',
       'For restaurants: include at least 3 options when possible: (1) one Michelin-star or clear fine-dining pick, (2) one famous street-food / market stall locals love, note strong TripAdvisor (or similar) reputation, (3) one other authentic local favorite. Put labels like "Michelin-style", "Street food", "Local classic" in title or notes.',
       'For weather: weatherPracticalTips (what to wear / rain / UV) — not raw API codes.',
@@ -1222,13 +1321,200 @@ export class GeminiAssistant extends BaseScriptComponent {
       merged.length > 900 ? `${merged.substring(0, 897)}…` : merged
   }
 
+  /** Spoken ordinals / cardinals ASR often drops ("13" vs "13th") — normalize before date regexes. */
+  private normalizeVoiceDateTokens(lowered: string): string {
+    let s = lowered
+    const ordinals: [string, string][] = [
+      ['first', '1st'],
+      ['second', '2nd'],
+      ['third', '3rd'],
+      ['fourth', '4th'],
+      ['fifth', '5th'],
+      ['sixth', '6th'],
+      ['seventh', '7th'],
+      ['eighth', '8th'],
+      ['ninth', '9th'],
+      ['tenth', '10th'],
+      ['eleventh', '11th'],
+      ['twelfth', '12th'],
+      ['thirteenth', '13th'],
+      ['fourteenth', '14th'],
+      ['fifteenth', '15th'],
+      ['sixteenth', '16th'],
+      ['seventeenth', '17th'],
+      ['eighteenth', '18th'],
+      ['nineteenth', '19th'],
+      ['twentieth', '20th'],
+      ['twenty-first', '21st'],
+      ['twenty-second', '22nd'],
+      ['twenty-third', '23rd'],
+      ['twenty-fourth', '24th'],
+      ['twenty-fifth', '25th'],
+      ['twenty-sixth', '26th'],
+      ['twenty-seventh', '27th'],
+      ['twenty-eighth', '28th'],
+      ['twenty-ninth', '29th'],
+      ['thirtieth', '30th'],
+      ['thirty-first', '31st'],
+    ]
+    for (let i = 0; i < ordinals.length; i++) {
+      const re = new RegExp(`\\b${ordinals[i][0]}\\b`, 'g')
+      s = s.replace(re, ordinals[i][1])
+    }
+    const cardinals: [string, string][] = [
+      ['one', '1'],
+      ['two', '2'],
+      ['three', '3'],
+      ['four', '4'],
+      ['five', '5'],
+      ['six', '6'],
+      ['seven', '7'],
+      ['eight', '8'],
+      ['nine', '9'],
+      ['ten', '10'],
+      ['eleven', '11'],
+      ['twelve', '12'],
+      ['thirteen', '13'],
+      ['fourteen', '14'],
+      ['fifteen', '15'],
+      ['sixteen', '16'],
+      ['seventeen', '17'],
+      ['eighteen', '18'],
+      ['nineteen', '19'],
+      ['twenty', '20'],
+      ['thirty', '30'],
+    ]
+    for (let j = 0; j < cardinals.length; j++) {
+      const re2 = new RegExp(`\\b${cardinals[j][0]}\\b`, 'g')
+      s = s.replace(re2, cardinals[j][1])
+    }
+    return s
+  }
+
+  private isPlausibleSpeechDateFragment(raw: string): boolean {
+    const t = raw.trim().toLowerCase()
+    if (t.length < 3) {
+      return false
+    }
+    const words = t.split(/\s+/).filter((w) => w.length > 0)
+    if (words.length === 1 && GeminiAssistant.SPEECH_DATE_NOISE_WORDS.has(words[0])) {
+      return false
+    }
+    if (/\d/.test(t)) {
+      return true
+    }
+    if (
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/.test(
+        t,
+      )
+    ) {
+      return true
+    }
+    if (/\b(tomorrow|today|tonight|next\s+week)\b/.test(t)) {
+      return true
+    }
+    return false
+  }
+
+  private monthAbbrToIndex(m: string): number {
+    const ml = m.substring(0, 3).toLowerCase()
+    const map: { [k: string]: number } = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      sept: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    }
+    const v = map[ml]
+    return v !== undefined ? v : -1
+  }
+
+  private monthDayToTripFormat(monthIdx: number, day: number): string {
+    const y = new Date().getFullYear()
+    const d = new Date(y, monthIdx, day)
+    return this.formatTripCalendarDate(d)
+  }
+
+  /**
+   * "from tomorrow until the end of the month" (and close variants) → calendar dates in dd/mm/yyyy.
+   */
+  private extractFluentUntilEndOfMonth(lowered: string): { depart: string; arrive: string } | null {
+    if (!/\buntil\s+(?:the\s+)?end\s+of\s+(?:the\s+)?month\b/.test(lowered)) {
+      return null
+    }
+    const hasTomorrowAnchor =
+      /\bfrom\s+tomorrow\b/.test(lowered) ||
+      /\b(starting|depart(?:ing|ure)?|leav(?:e|ing)|go(?:ing)?)\s+tomorrow\b/.test(lowered) ||
+      /\btomorrow\s+until\s+(?:the\s+)?end\s+of\s+(?:the\s+)?month\b/.test(lowered)
+    const hasTodayAnchor =
+      /\bfrom\s+today\b/.test(lowered) || /\b(starting|depart(?:ing|ure)?|leav(?:e|ing))\s+today\b/.test(lowered)
+    let startOffset = -1
+    if (hasTomorrowAnchor) {
+      startOffset = 1
+    } else if (hasTodayAnchor) {
+      startOffset = 0
+    }
+    if (startOffset < 0) {
+      return null
+    }
+    const startDate = this.addCalendarDays(new Date(), startOffset)
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0)
+    if (endDate < startDate) {
+      return null
+    }
+    return {
+      depart: this.formatTripCalendarDate(startDate),
+      arrive: this.formatTripCalendarDate(endDate),
+    }
+  }
+
+  private isStrictTripCalendarDate(s: string): boolean {
+    return /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test((s || '').trim())
+  }
+
+  private stripGarbageDateFields(): void {
+    if (!this.isStrictTripCalendarDate(this.tripDraft.departureDateTime)) {
+      this.tripDraft.departureDateTime = ''
+    }
+    if (!this.isStrictTripCalendarDate(this.tripDraft.arrivalDateTime)) {
+      this.tripDraft.arrivalDateTime = ''
+    }
+  }
+
   private extractDateTimeAfterKeyword(text: string, keyword: string): string {
-    const regex = new RegExp(`${keyword}[a-z\\s]*\\s+([a-z0-9,:\\-\\s]{4,60})`)
-    const match = text.match(regex)
-    if (!match || match.length < 2) {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const head = text.match(new RegExp(`\\b${escaped}(?:ing|ure|ed|s)?\\s+`, 'i'))
+    if (!head || head.index === undefined) {
       return ''
     }
-    return match[1].trim()
+    const i0 = head.index + head[0].length
+    let frag = text.substring(i0, i0 + 96).trim()
+    const cutIdx = frag.search(/\b(until|through|returning|arriving|,|;)\b/i)
+    if (cutIdx >= 4) {
+      frag = frag.substring(0, cutIdx).trim()
+    }
+    if (!this.isPlausibleSpeechDateFragment(frag)) {
+      return ''
+    }
+    const tl = frag.trim().toLowerCase()
+    if (/^tomorrow\b/.test(tl)) {
+      return this.formatTripCalendarDate(this.addCalendarDays(new Date(), 1))
+    }
+    if (/^today\b/.test(tl)) {
+      return this.formatTripCalendarDate(this.addCalendarDays(new Date(), 0))
+    }
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(frag.trim())) {
+      return frag.trim()
+    }
+    return frag.length > 48 ? frag.substring(0, 48).trim() : frag
   }
 
   private extractPurpose(text: string): TripPurpose | '' {

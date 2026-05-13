@@ -16,11 +16,11 @@ Only these three purpose labels are supported now:
 - `Bleisure`
 
 ### Bottom buttons (recommended wiring)
-- **Voice Mode pinch** → `AIAssistantUIBridge.startAssistantButton` — runs `beginAssistantSessionFromContext()` **and** `ASRQueryController.toggleRecording()` on every pinch (listen ↔ stop). No PinchButton on `ASRQueryController` anymore (avoids dead refs / double subscriptions).
+- **Voice Mode pinch** → `AIAssistantUIBridge.startAssistantButton` — runs `beginAssistantSessionFromContext()` **and** `ASRQueryController.toggleRecording()` (listen ↔ stop). After each **final** ASR transcript, the bridge **starts listening again** after a short delay so the user usually does **not** need a second pinch between intake turns (pinch again to stop or to cancel a pending auto-listen). No PinchButton on `ASRQueryController` anymore (avoids dead refs / double subscriptions).
 - **Mic mute (SIK Toggle on Btn_Mic)** → `AIAssistantUIBridge.micMuteToggle` — toggles mute inside `ASRQueryController` (`toggleMicMuted()`). **ON = muted.** It does **not** start STT; use **Voice Mode** pinch for capture.
 - **Plan Trip button** → `AIAssistantUIBridge.planTripButton`
 - **Keyboard pinch** → `AIAssistantUIBridge.keyboardToggleButton`
-- **Keyboard confirm pinch** → `AIAssistantUIBridge.keyboardConfirmButton`
+- **Keyboard confirm pinch** → `AIAssistantUIBridge.keyboardConfirmButton` (Confirm is **keyboard-only**: its SceneObject is hidden until keyboard mode is active, so it does not sit on screen during voice-only use.)
 - **Swap pinch handlers** → enable **`swapVoiceAndKeyboardPinchButtons`** on `AIAssistantUIBridge` only if gaze consistently hits the wrong capsule (overlapping colliders); otherwise keep **off** and fix hierarchy / assignments.
 
 ### Voice / hint text (scene)
@@ -29,6 +29,20 @@ Only these three purpose labels are supported now:
 - **`AIAssistantUIBridge.hintText`** → same VoiceHint line: bridge writes welcome + **last accepted utterance** after `handleSpeechTranscript`.
 - If **Voice** and **KEYBOARD** feel reversed, first re-drag PinchButtons as above; if layout cannot be fixed, enable **`swapVoiceAndKeyboardPinchButtons`** instead of crossing wires in the Inspector.
 - Duplicate legacy **`ASRQueryController`** scene object at project root is **disabled** so only the controller on `Assistant_System` drives transcription.
+
+### Optional assistant TTS (keyboard + voice guidance)
+
+Add **`AssistantTtsController`** on the same hierarchy as `GeminiAssistant` / `AIAssistantUIBridge`:
+
+| Input | Purpose |
+|---|---|
+| `geminiAssistant` | Speaks status / missing-field lines from `onPromptGenerated` when **`speakVoiceGuidance`** is on. |
+| `uiBridge` | Speaks keyboard step prompts via **`onKeyboardGuidance`** when **`speakKeyboardGuidance`** is on. |
+| `audioOutputRoot` | Optional object with (or without) **AudioComponent**; TTS MP3 plays here. |
+
+**Credentials:** set an **OpenAI** API token on **`RemoteServiceGatewayCredentials`** (same slot as other RSG OpenAI examples). Without it, TTS calls fail silently in logs; on-screen text is unchanged.
+
+**Toggles:** `enableTts`, `speakKeyboardGuidance`, and `speakVoiceGuidance` can be adjusted per build. Editor-only lines such as “AR keyboard: build to Spectacles” are skipped for keyboard TTS.
 
 ### AR keyboard for typed trip fields (Spectacles pattern)
 
@@ -58,60 +72,48 @@ Assign on `AIAssistantUIBridge`:
 Step sequence:
 1. departure city
 2. destination city
-3. departure date (`dd/mm/yyyy`)
-4. arrival date (`dd/mm/yyyy`)
+3. departure date (`dd/mm/yyyy` or eight digits `ddmmyyyy`, stored as `dd/mm/yyyy`)
+4. arrival date (same formats)
 
 Each step requires pinch confirm.
 
-### Pack Scan HUD (single-controller, package-backed)
+### Pack Scan HUD (single flow)
 
-Pack scan uses **one** controller — `PackScanController` — and the **CropCameraTexture** Asset Library package for the camera/crop texture work. There are no separate `CameraFeedController` / `CropPackScanController` scripts (those were removed; if you previously added them as components, delete the broken script components in the Lens Studio Inspector).
+Pack scan uses **`PackScanController`**: **Scan Pack** → session with **Capture** + **Close**. **Live camera preview defaults on** — assign **`cameraPreviewRoot`** (e.g. Crop Camera Texture prefab root) so users see what the capture will use. Turn **`showLiveCameraPreview`** off only if you want passthrough-only (no panel). Preview stays visible while **Analyzing…** after Capture until Close or idle.
 
-**Two trigger points** for Pack details (both already work, nothing to add):
-- Pinch the **Scan Pack** PinchButton → opens a scan session in `PackScanController`.
-- Tap the **Pack category title** interactable → `CategoryPlanDetailController` opens the HUD + detail panel and shows the last scan result. No new scan runs from this path.
+**Camera texture:** Wire **`originalCameraTexture`** to any device camera feed (Crop package **Device Camera Texture** is fine for capture-only; the Crop prefab UI can stay disabled / unassigned on `cameraPreviewRoot`). Optional: **`weatherAccuBridge`** for richer “Suggested additions” using the AccuWeather summary.
 
-**One-time scene setup:**
+**Two trigger points** for Pack details:
+- Pinch **Scan Pack** → opens a session in `PackScanController`.
+- Tap the **Pack category title** → `CategoryPlanDetailController` opens the HUD + detail panel; shows the last scan result without starting a new scan.
 
-1. From **Asset Library**, add **`Crop Camera Texture`**. Drag the package's prefab `Packages/CropCameraTexture.lspkg/Assets/CropCameraTextureTS__PLACE_IN_SCENE.prefab` under `PackScanHUD_Placeholder`. The package starts the camera on lens load and drives the preview image automatically — no per-frame code needed from us.
-2. In the Inspector for the package's `CameraTexture` script, set the crop rectangle (`cropLeft`, `cropRight`, `cropTop`, `cropBottom`, all in `-1..1`) so the **Crop mode** snapshot focuses on where the user will hold the bag (typically a centered square slightly below eye level).
-3. Add three new **PinchButtons** under `PackScanHUD_Placeholder`:
-   - `Btn_Capture_Pack`
-   - `Btn_Crop_Pack`
-   - `Btn_Close_Pack`
-4. (Optional) Add a `CropHint_Root` SceneObject with a Text + dotted box visual.
+**Scene setup:**
 
-**`PackScanController` inputs (assign in Inspector):**
+1. **Capture feed:** Assign **`originalCameraTexture`** (Crop package device texture or your camera output).
+2. **Camera preview (recommended):** Assign **`cameraPreviewRoot`** to your preview root (e.g. `CropCameraTextureTS`). Keep **`showLiveCameraPreview`** on (default) so it shows during the session.
+3. Add **PinchButtons**: `Btn_Capture_Pack`, `Btn_Close_Pack` (and existing `Btn_Scan_Pack`).
+
+**`PackScanController` inputs:**
 
 | Input | Wire to |
 |---|---|
-| `geminiAssistant` | `GeminiAssistant` on `Assistant_System` |
-| `scanButton` | PinchButton on `Btn_Scan_Pack` (existing) |
-| `captureButton` | PinchButton on `Btn_Capture_Pack` |
-| `cropScanButton` | PinchButton on `Btn_Crop_Pack` |
-| `closeButton` | PinchButton on `Btn_Close_Pack` |
+| `geminiAssistant` | `GeminiAssistant` |
+| `weatherAccuBridge` | optional same `WeatherAccuBridge` as category Weather row |
+| `scanButton` | `Btn_Scan_Pack` |
+| `captureButton` | `Btn_Capture_Pack` |
+| `closeButton` | `Btn_Close_Pack` |
 | `packScanHud` | `PackScanHUD_Placeholder` |
-| `packHudText` | `PackScanHUD_Text` |
-| `detailBodyText` | `CategoryDetail_Text` (persistent mirror) |
-| `observedItemsText` | leave empty unless you add a typed *“items I packed”* Text |
-| `cameraPreviewRoot` | SceneObject `CropCameraTextureTS` (the package prefab root) |
-| `originalCameraTexture` | `Packages/CropCameraTexture.lspkg/Assets/Render/Device Camera Texture.deviceCameraTexture` |
-| `cropCameraTexture` | `Packages/CropCameraTexture.lspkg/Assets/Render/Screen Crop Texture.screenCropTexture` |
-| `cropHintRoot` | optional `CropHint_Root` SceneObject |
-| `geminiModel` | `gemini-2.0-flash` (default) |
+| `packHudText` | **Leave empty** (deprecated). |
+| `detailBodyText` | **`CategoryDetail_Text`** on **`CategoryDetail_Text_Body`** — pack status, “Analyzing…”, and scan results all write here (same panel as category beta copy). |
+| `observedItemsText` | optional typed list `Text` |
+| `cameraPreviewRoot` | optional; only used when **`showLiveCameraPreview`** is on |
+| `originalCameraTexture` | device / package camera texture for JPEG snapshot |
 
-**Runtime flow:**
-1. Open the **Pack** category row → `PackScanHUD_Placeholder` enabled, last result (if any) still shown in `CategoryDetail_Text`.
-2. Pinch **Scan Pack** → camera preview, Capture, Crop Scan, Close become visible.
-3. Pinch **Capture** (FullFrame) → snapshot of `originalCameraTexture` → RSG `VideoController` → base64 JPEG → Gemini Vision (`inlineData`) → result mirrored to `PackScanHUD_Text` and `CategoryDetail_Text`.
-4. Or pinch **Crop Scan** → live preview hides, **Crop hint** shows. Pinch **Capture** again → snapshot of `cropCameraTexture` (the cropped region only, no surroundings) → Gemini Vision.
-5. Pinch **Close** → preview + buttons hide, inline HUD text cleared, detail-panel mirror preserved.
-6. Pinching **Scan Pack** at any time restarts FullFrame mode and overwrites the next result.
+**Note:** The `Text` component must sit on an **enabled** SceneObject; a disabled parent + `.text` updates can crash the lens.
 
-**Notes:**
-- Camera permission is requested by the package on lens start. The viewfinder is only **displayed** after Scan Pack is pinched; nothing is sent to any server until Capture.
-- Setup hints are emitted via `NativeLogger("PackScanController")`, not painted on the HUD text — open the Logger panel to see them while debugging.
-- Editor fallback: if `VideoController` or the camera is unavailable (Lens Studio preview without permission), Capture automatically falls back to a text-only Gemini call so the feature still produces a result.
+**Runtime:** Open Pack row → pinch Scan Pack → Capture sends one frame to Gemini Vision. **Close** only hides capture UI; scan copy stays on **`CategoryDetail_Text`** until the next category tap or new scan.
+
+**Important:** Use **exactly one** `PackScanController` in the scene wired to **Scan / Capture / Close** and **`cameraPreviewRoot`**. A second copy on the same pinch handlers will fight the first (preview stuck off, double state). Disable or remove duplicate components.
 
 ### Loading bar while generating plan
 On `GeminiAssistant`, assign:

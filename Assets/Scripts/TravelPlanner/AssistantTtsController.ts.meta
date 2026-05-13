@@ -1,0 +1,74 @@
+- !<AssetImportMetadata/f0e1d00a-0001-4001-8001-0000000000aa>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> f0e1d00a-0001-4001-8001-000000000001
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> f0e1d00a-0001-4001-8001-000000000001
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> f0e1d00a-0001-4001-8001-000000000002
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/f0e1d00a-0001-4001-8001-000000000002>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: f0e1d00a-0001-4001-8001-000000000003
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    audioOutputRoot: false
+    debounceSec: false
+    enableTts: false
+    geminiAssistant: false
+    maxSpeakChars: false
+    speakKeyboardGuidance: false
+    speakVoiceGuidance: false
+    ttsModel: false
+    ttsVoice: false
+    uiBridge: false
+    verboseLogs: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      uiBridge: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      audioOutputRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      enableTts: true
+      speakKeyboardGuidance: true
+      speakVoiceGuidance: true
+      ttsModel: tts-1
+      ttsVoice: nova
+      debounceSec: 0.450000
+      maxSpeakChars: !<float> 420.000000
+      verboseLogs: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input AssignableType geminiAssistant {"hint":"Trip assistant whose status / missing-field prompts are spoken in voice mode."}'
+    - '// @input AssignableType_1 uiBridge {"hint":"UI bridge whose keyboard prompts are spoken while keyboard flow is active."}'
+    - '// @input SceneObject audioOutputRoot {"hint":"SceneObject that plays TTS (gets or creates AudioComponent). Defaults to this object."}'
+    - '// @input bool enableTts = true {"hint":"Master switch for all TTS."}'
+    - '// @input bool speakKeyboardGuidance = true {"hint":"Speak keyboard step prompts from the bridge."}'
+    - '// @input bool speakVoiceGuidance = true {"hint":"Speak GeminiAssistant status / guidance lines (missing fields, welcome, etc.)."}'
+    - '// @input string ttsModel = "tts-1" {"hint":"OpenAI speech model (e.g. tts-1, tts-1-hd, gpt-4o-mini-tts)."}'
+    - '// @input string ttsVoice = "nova" {"hint":"OpenAI TTS voice (e.g. nova, alloy, shimmer)."}'
+    - '// @input float debounceSec = 0.45 {"hint":"Debounce rapid text updates before calling the API (seconds)."}'
+    - '// @input float maxSpeakChars = 420 {"hint":"Max characters sent to TTS (rest truncated)."}'
+    - '// @input bool verboseLogs = true {"hint":"Log TTS lifecycle / errors."}'

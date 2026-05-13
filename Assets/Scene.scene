@@ -249,7 +249,7 @@
   PrefabRemaps:
     []
   Name: Object 0
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: -1.514221, z: 0.000000}
@@ -8230,7 +8230,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.880144, y: -12.403435, z: 10.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 3.000000, y: 1.500000, z: 2.142857}
+    Scale: {x: 2.000000, y: 1.500000, z: 2.142857}
     HasSegmentScaleCompensation: false
   Children:
     - !<own> f453ac78-5a7f-4780-a8ca-a07b4c98157c
@@ -10350,6 +10350,8 @@
   Enabled: true
   ScriptAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
   ScriptInputsDefault:
+    packHudText: true
+    showLiveCameraPreview: true
     geminiModel: true
     captureIntervalMs: true
     verboseLogs: true
@@ -10360,16 +10362,15 @@
       geminiAssistant: !<MappingBased.AssignableType> f0e1d005-0001-4001-8001-000000000001
       scanButton: !<MappingBased.AssignableType_1> 78476e02-7aa6-400c-a44f-672833994772
       captureButton: !<MappingBased.AssignableType_2> ae7c9294-9baf-465c-aa1c-d85b87c95791
-      cropScanButton: !<MappingBased.AssignableType_3> 401a531c-f081-497e-ae4f-1b4a17d514d3
-      closeButton: !<MappingBased.AssignableType_4> 50dc9cf9-b2c8-46ee-bb34-e79cd0345b66
+      closeButton: !<MappingBased.AssignableType_3> 50dc9cf9-b2c8-46ee-bb34-e79cd0345b66
       packScanHud: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
-      packHudText: !<reference.Text> a9bf1bb5-c4cb-49b5-af81-b17882f2ce8f
+      packHudText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       detailBodyText: !<reference.Text> f0e1b003-0001-4001-8001-000000000093
       observedItemsText: !<reference.Text> 2886019e-b507-46c2-aaf7-f08cb2807364
       cameraPreviewRoot: !<reference.SceneObject> 716b2d60-d946-46c1-b821-59a7e9f4e428
+      showLiveCameraPreview: true
       originalCameraTexture: !<reference.Texture> c3060e7e-94fa-4b19-8aff-075f2e32fbec
-      cropCameraTexture: !<reference.Texture> 19b09aae-b059-4551-b002-c759e908b66c
-      cropHintRoot: !<reference.SceneObject> f453ac78-5a7f-4780-a8ca-a07b4c98157c
+      weatherAccuBridge: !<MappingBased.AssignableType_4> f0e1d006-0001-4001-8001-000000000071
       geminiModel: gemini-2.0-flash
       captureIntervalMs: !<float> 250.000000
       verboseLogs: true
@@ -13554,7 +13555,7 @@
   MeshShadowMode: None
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
-  Text: "Modify the offset in the Screen Crop Texture object you find in the package folder "
+  Text: Scan your packed items
   Editable: false
   ShowEditingPreview: true
   TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
@@ -19200,17 +19201,15 @@
   PrefabRemaps:
     []
   Name: PackScanController
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> f0e1d007-0001-4001-8001-000000000001
   ScriptInputsDefault:
     captureButton: true
-    cropScanButton: true
     closeButton: true
     observedItemsText: true
     cameraPreviewRoot: true
     originalCameraTexture: true
-    cropCameraTexture: true
-    cropHintRoot: true
+    weatherAccuBridge: true
     geminiModel: true
     captureIntervalMs: true
     verboseLogs: true
@@ -19221,16 +19220,15 @@
       geminiAssistant: !<MappingBased.AssignableType> f0e1d005-0001-4001-8001-000000000001
       scanButton: !<MappingBased.AssignableType_1> 78476e02-7aa6-400c-a44f-672833994772
       captureButton: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
-      cropScanButton: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
-      closeButton: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
+      closeButton: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       packScanHud: !<reference.SceneObject> f0e1a001-0001-4001-8001-000000000094
       packHudText: !<reference.Text> f0e1b003-0001-4001-8001-000000000094
       detailBodyText: !<reference.Text> f0e1b003-0001-4001-8001-000000000093
       observedItemsText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       cameraPreviewRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      showLiveCameraPreview: false
       originalCameraTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
-      cropCameraTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
-      cropHintRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      weatherAccuBridge: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
       geminiModel: gemini-2.0-flash
       captureIntervalMs: !<float> 250.000000
       verboseLogs: true
@@ -19354,7 +19352,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 12.307321, z: 0.000000}
+    Position: {x: 0.000000, y: 12.307321, z: 0.030000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -19382,7 +19380,7 @@
   PrefabRemaps:
     []
   Name: cropScanButton
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.698620, y: 9.577961, z: 1.000000}

@@ -4,34 +4,15 @@ import { Gemini } from 'RemoteServiceGateway.lspkg/HostedExternal/GoogleGenAI'
 import { GoogleGenAITypes } from 'RemoteServiceGateway.lspkg/HostedExternal/GoogleGenAITypes'
 import { VideoController } from 'RemoteServiceGateway.lspkg/Helpers/VideoController'
 import { GeminiAssistant } from './GeminiAssistant'
+import { WeatherAccuBridge } from './WeatherAccuBridge'
 
 type PackScanState = 'idle' | 'open' | 'sending'
 
 /**
- * Pack scan orchestrator backed by the **CropCameraTexture** Asset Library package.
- *
- * Camera lifecycle is owned by `Packages/CropCameraTexture.lspkg/Scripts/CameraTexture.ts`,
- * which starts on `OnStartEvent` and drives an Image with the cropped texture every frame.
- * This controller only:
- *   1. Toggles the visibility of the package's preview SceneObject so the camera viewfinder is
- *      hidden until the user pinches **Scan Pack** and is hidden again on **Close**.
- *   2. Reads `originalCameraTexture` (full frame) or `cropCameraTexture` (cropped) at capture
- *      time and pipes it through RSG `VideoController` → base64 JPEG → Gemini Vision.
- *   3. Mirrors the result into the inline HUD text **and** the persistent detail-panel text so
- *      tapping the Pack category row after Close still surfaces the last scan.
- *
- * Two trigger points for Pack details (both already work):
- *   - Pinch **`scanButton`** → opens the scan session (this controller).
- *   - Tap the **Pack category title** (handled by `CategoryPlanDetailController`) → opens the
- *     Pack HUD and the detail panel; the last scan result is preserved in `detailBodyText`.
- *
- * State machine (`idle | open | sending` with sub-flag `cropMode`):
- *   idle    ── Scan Pack ──▶ open(full)
- *   open(full) ── Crop Scan ─▶ open(crop)       (hide live preview, show crop hint)
- *   open(crop) ── Crop Scan ─▶ open(full)       (re-show preview, hide crop hint)
- *   open(*)  ── Capture ────▶ sending ──▶ idle  (camera display hidden, result written)
- *   open(*)  ── Scan Pack ──▶ open(full)        (restart, overwrites previous text on capture)
- *   any     ── Close ──────▶ idle               (detail panel keeps the last result)
+ * Pack scan: **Scan Pack** opens a session (Capture + Close; optional live preview), **Capture**
+ * sends one frame from `originalCameraTexture` to Gemini Vision. **Live preview defaults on**
+ * so users see the capture frame on-screen; turn **`showLiveCameraPreview`** off if you prefer passthrough-only.
+ * All pack status + results go to **`detailBodyText`** (same `CategoryDetail_Text` as category rows).
  */
 @component
 export class PackScanController extends BaseScriptComponent {
@@ -47,17 +28,12 @@ export class PackScanController extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Pinch button shown while a session is open. Snapshots the current view to Gemini Vision.')
+  @hint('Pinch button shown while a session is open. Snapshots the camera frame to Gemini Vision.')
   captureButton: PinchButton
 
   @input
   @allowUndefined
-  @hint('Pinch button that toggles Crop mode (hides the live preview, shows the crop hint).')
-  cropScanButton: PinchButton
-
-  @input
-  @allowUndefined
-  @hint('Pinch button that closes the scan session, releases the preview, and clears the HUD inline text.')
+  @hint('Pinch button that closes the scan session (capture UI only; detail text stays on CategoryDetail_Text).')
   closeButton: PinchButton
 
   @input
@@ -67,12 +43,12 @@ export class PackScanController extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Main inline text inside Pack HUD. Cleared by Close; latest result is mirrored to detailBodyText.')
+  @hint('Deprecated — leave unassigned. Pack scan uses `detailBodyText` only (same line as category detail).')
   packHudText: Text
 
   @input
   @allowUndefined
-  @hint('Persistent Pack detail text. Preserved across Close and the next time the category row is tapped.')
+  @hint('Category detail body (e.g. `CategoryDetail_Text` on `CategoryDetail_Text_Body`). All pack messages + scan results write here.')
   detailBodyText: Text
 
   @input
@@ -82,23 +58,22 @@ export class PackScanController extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('SceneObject of the CropCameraTexture package preview (e.g. `CropCameraTextureTS`). Toggled visible while a session is open.')
+  @hint('Optional live camera preview root (e.g. CropCameraTexture prefab). Shown while a session is open when `showLiveCameraPreview` is on.')
   cameraPreviewRoot: SceneObject
 
   @input
+  @hint('Show `cameraPreviewRoot` during an open scan session (including while analyzing after Capture). Off = no on-screen camera panel.')
+  showLiveCameraPreview: boolean = true
+
+  @input
   @allowUndefined
-  @hint('Original camera Texture from the package (Device Camera Texture). Used for full-frame capture.')
+  @hint('Texture used for JPEG capture (often Crop package output). Preview panel does not require this to be set; Capture does.')
   originalCameraTexture: Texture
 
   @input
   @allowUndefined
-  @hint('Cropped camera Texture from the package (Screen Crop Texture). Used for cropped capture.')
-  cropCameraTexture: Texture
-
-  @input
-  @allowUndefined
-  @hint('Optional UI root for the Crop hint (text / dotted overlay). Shown only in Crop mode.')
-  cropHintRoot: SceneObject
+  @hint('Optional AccuWeather bridge — last summary is passed into the prompt so "Suggested additions" can follow real conditions.')
+  weatherAccuBridge: WeatherAccuBridge
 
   @input
   @hint('Gemini model for pack-check generation. gemini-2.0-flash supports inlineData images.')
@@ -114,16 +89,15 @@ export class PackScanController extends BaseScriptComponent {
 
   private readonly log = new NativeLogger('PackScanController')
   private state: PackScanState = 'idle'
-  private cropMode: boolean = false
   private pendingCapture: VideoController | null = null
+  /** Bumped to cancel in-flight deferred camera preview when session closes or reopens. */
+  private previewEnableToken: number = 0
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
       this.bindUi()
       this.applyIdleVisibility()
-      this.tripLog(
-        'PackScanController ready. Idle until user pinches Scan Pack. Camera is owned by CropCameraTexture.lspkg.',
-      )
+      this.tripLog('PackScanController ready. Pinch Scan Pack to open session; live camera preview follows `showLiveCameraPreview`.')
     })
   }
 
@@ -131,62 +105,53 @@ export class PackScanController extends BaseScriptComponent {
     if (this.scanButton) {
       this.scanButton.onButtonPinched.add(() => this.onScanPack())
     } else {
-      this.tripLog('scanButton not assigned — Scan Pack pinch will not trigger.')
+      this.tripLog('scanButton not assigned.')
     }
     if (this.captureButton) {
       this.captureButton.onButtonPinched.add(() => this.onCapture())
-    }
-    if (this.cropScanButton) {
-      this.cropScanButton.onButtonPinched.add(() => this.onCropScanToggle())
     }
     if (this.closeButton) {
       this.closeButton.onButtonPinched.add(() => this.onClose())
     }
   }
 
-  // ─── Button handlers ───────────────────────────────────────────────────────
-
   private onScanPack(): void {
     if (!this.packScanHud || !this.packScanHud.enabled) {
-      this.tripLog('Scan Pack ignored: packScanHud is not enabled (open the Pack category row first).')
+      this.tripLog('Scan Pack ignored: packScanHud is not enabled.')
       return
     }
     if (this.state === 'sending') {
-      this.tripLog('Scan Pack ignored while previous scan is still sending.')
+      this.tripLog('Scan Pack ignored while sending.')
       return
     }
-    this.state = 'open'
-    this.cropMode = false
-    this.applyOpenVisibility()
-    this.tripLog('Scan session opened in FullFrame mode.')
-  }
-
-  private onCropScanToggle(): void {
-    if (this.state !== 'open') {
-      this.tripLog('Crop Scan ignored: scan session is not open.')
-      return
+    try {
+      this.state = 'open'
+      this.applyOpenVisibility()
+      this.tripLog('Scan session opened.')
+    } catch (e) {
+      this.log.e(`onScanPack failed: ${e}`)
+      print(`[PackScanController] onScanPack failed: ${e}`)
+      this.previewEnableToken++
+      this.state = 'idle'
+      this.applyIdleVisibility()
     }
-    this.cropMode = !this.cropMode
-    this.applyOpenVisibility()
-    this.tripLog(`Crop mode ${this.cropMode ? 'ON (live preview hidden, capture targets crop texture)' : 'OFF (live preview visible)'}.`)
   }
 
   private onCapture(): void {
     if (this.state !== 'open') {
-      this.tripLog('Capture ignored: scan session is not open.')
+      this.tripLog('Capture ignored: session not open.')
       return
     }
-    const source = this.cropMode ? this.cropCameraTexture : this.originalCameraTexture
-    if (!source) {
-      const label = this.cropMode ? 'cropCameraTexture' : 'originalCameraTexture'
-      this.tripLog(`Capture: ${label} not assigned. Falling back to text-only.`)
-      this.submitTextOnly('Camera frame unavailable; using text-only pack check.')
+    if (!this.originalCameraTexture) {
+      this.tripLog('originalCameraTexture not assigned. Text-only fallback.')
+      this.submitTextOnly('Camera texture not assigned; using text-only pack check.')
       return
     }
-    this.snapshotAndSend(source, this.cropMode ? 'cropped' : 'full-frame')
+    this.snapshotAndSend(this.originalCameraTexture)
   }
 
   private onClose(): void {
+    this.previewEnableToken++
     if (this.pendingCapture) {
       try {
         this.pendingCapture.stopRecording()
@@ -196,55 +161,74 @@ export class PackScanController extends BaseScriptComponent {
       this.pendingCapture = null
     }
     this.state = 'idle'
-    this.cropMode = false
     this.applyIdleVisibility()
-    this.setHudText('')
-    this.tripLog('Scan session closed; detail-panel mirror preserved.')
+    this.tripLog('Scan session closed.')
   }
 
-  // ─── Visibility helpers ────────────────────────────────────────────────────
-
   private applyIdleVisibility(): void {
+    this.previewEnableToken++
     this.setCameraPreviewVisible(false)
-    this.setCropHintVisible(false)
     this.setButtonVisible(this.captureButton, false)
-    this.setButtonVisible(this.cropScanButton, false)
     this.setButtonVisible(this.closeButton, false)
     this.setButtonVisible(this.scanButton, true)
   }
 
   private applyOpenVisibility(): void {
-    if (this.cropMode) {
-      this.setCameraPreviewVisible(false)
-      this.setCropHintVisible(true)
-    } else {
-      this.setCameraPreviewVisible(true)
-      this.setCropHintVisible(false)
-    }
+    this.previewEnableToken++
+    this.setCameraPreviewVisible(false)
     this.setButtonVisible(this.captureButton, true)
-    this.setButtonVisible(this.cropScanButton, true)
     this.setButtonVisible(this.closeButton, true)
     this.setButtonVisible(this.scanButton, true)
+    if (!this.shouldShowLiveCameraPanel()) {
+      if (this.showLiveCameraPreview && !this.cameraPreviewRoot) {
+        this.tripLog('Live preview skipped: assign cameraPreviewRoot (e.g. CropCameraTexture scene root).')
+      }
+      return
+    }
+    const token = this.previewEnableToken
+    const delayed = this.createEvent('DelayedCallbackEvent')
+    delayed.bind(() => {
+      if (token !== this.previewEnableToken || this.state !== 'open') {
+        return
+      }
+      try {
+        this.setCameraPreviewVisible(true)
+        if (!this.originalCameraTexture) {
+          this.tripLog('Preview visible; assign originalCameraTexture on PackScanController for Capture.')
+        }
+      } catch (e) {
+        this.log.e(`Deferred camera preview failed: ${e}`)
+        print(`[PackScanController] Deferred camera preview failed: ${e}`)
+      }
+    })
+    delayed.reset(0.08)
   }
 
   private applySendingVisibility(): void {
-    this.setCameraPreviewVisible(false)
-    this.setCropHintVisible(false)
+    this.setCameraPreviewVisible(this.shouldShowLiveCameraPanel())
     this.setButtonVisible(this.captureButton, false)
-    this.setButtonVisible(this.cropScanButton, false)
     this.setButtonVisible(this.closeButton, true)
     this.setButtonVisible(this.scanButton, false)
   }
 
-  private setCameraPreviewVisible(visible: boolean): void {
-    if (this.cameraPreviewRoot) {
-      this.cameraPreviewRoot.enabled = visible
-    }
+  /**
+   * Whether to show the in-lens camera preview panel. Uses only `showLiveCameraPreview` +
+   * `cameraPreviewRoot` — **not** `originalCameraTexture` (Crop UI often drives the feed internally;
+   * assign `originalCameraTexture` separately for JPEG capture).
+   */
+  private shouldShowLiveCameraPanel(): boolean {
+    return !!(this.showLiveCameraPreview && this.cameraPreviewRoot)
   }
 
-  private setCropHintVisible(visible: boolean): void {
-    if (this.cropHintRoot) {
-      this.cropHintRoot.enabled = visible
+  private setCameraPreviewVisible(visible: boolean): void {
+    if (!this.cameraPreviewRoot) {
+      return
+    }
+    try {
+      this.cameraPreviewRoot.enabled = visible
+    } catch (e) {
+      this.log.e(`setCameraPreviewVisible failed: ${e}`)
+      print(`[PackScanController] setCameraPreviewVisible failed: ${e}`)
     }
   }
 
@@ -253,28 +237,19 @@ export class PackScanController extends BaseScriptComponent {
       return
     }
     try {
-      const obj = button.getSceneObject()
-      if (obj) {
-        obj.enabled = visible
-      }
+      button.getSceneObject().enabled = visible
     } catch (e) {
       this.log.e(`setButtonVisible failed: ${e}`)
     }
   }
 
-  // ─── Capture pipeline ──────────────────────────────────────────────────────
-
-  /**
-   * Encodes one frame from `source` to base64 JPEG via RSG VideoController, sends to Gemini
-   * Vision, then renders the response. Releases the recorder regardless of outcome.
-   */
-  private snapshotAndSend(source: Texture, label: string): void {
+  private snapshotAndSend(source: Texture): void {
     if (this.state === 'sending') {
       return
     }
     this.state = 'sending'
     this.applySendingVisibility()
-    this.setHudText(`Analyzing ${label}…`)
+    this.setPackDetailBody('Analyzing your items…')
 
     let video: VideoController
     try {
@@ -294,7 +269,6 @@ export class PackScanController extends BaseScriptComponent {
       }
       this.pendingCapture = null
       if (!base64 || base64.length === 0) {
-        this.log.e('VideoController emitted empty base64 frame.')
         this.submitTextOnly('Captured frame was empty; falling back to text-only.')
         return
       }
@@ -352,7 +326,7 @@ export class PackScanController extends BaseScriptComponent {
     } as unknown as GoogleGenAITypes.Gemini.Models.GenerateContentRequest
 
     Gemini.models(request)
-      .then((response) => this.applyResponse(response, 'image+text'))
+      .then((response) => this.applyResponse(response))
       .catch((error) => {
         this.log.e(`Gemini.models vision call failed: ${error}`)
         this.submitTextOnly('Vision scan failed; falling back to text-only pack check.')
@@ -362,75 +336,132 @@ export class PackScanController extends BaseScriptComponent {
   private submitTextOnly(statusLine: string): void {
     this.state = 'sending'
     this.applySendingVisibility()
-    this.setHudText(statusLine)
+    this.setPackDetailBody(statusLine)
     const prompt = this.buildPackPrompt()
     const request: GoogleGenAITypes.Gemini.Models.GenerateContentRequest = {
       model: this.geminiModel,
       type: 'generateContent',
       body: {
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }],
-          },
-        ],
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.2 },
       },
     }
     Gemini.models(request)
-      .then((response) => this.applyResponse(response, 'text-only'))
+      .then((response) => this.applyResponse(response))
       .catch((error) => {
         this.log.e(`Gemini.models text-only call failed: ${error}`)
-        this.setHudText('Pack scan failed. Check RSG token and connectivity.')
+        this.setPackDetailBody('Pack scan failed. Check RSG token and connectivity.')
         this.state = 'idle'
         this.applyIdleVisibility()
       })
   }
 
-  private applyResponse(response: any, source: string): void {
+  private applyResponse(response: any): void {
     const text = this.extractText(response)
     if (!text || text.length === 0) {
-      this.setHudText('No scan response. Try again.')
+      this.setPackDetailBody('No scan response. Try again.')
       this.state = 'idle'
       this.applyIdleVisibility()
       return
     }
     const compact = text.trim()
-    this.setHudText(`Pack scan (${source})\n${compact}`)
-    if (this.detailBodyText) {
-      this.detailBodyText.text = `— Pack (${source}) —\n\n${compact}`
-    }
+    this.setPackDetailBody(`— Pack —\n\n${compact}`)
     this.state = 'idle'
-    this.cropMode = false
     this.applyIdleVisibility()
   }
 
-  // ─── Prompt + response helpers ─────────────────────────────────────────────
-
   private buildPackPrompt(): string {
     const observed = this.observedItemsText ? this.observedItemsText.text.trim() : ''
-    const draft = this.geminiAssistant ? this.geminiAssistant.getTripDraft() : null
+    const draft = this.geminiAssistant ? this.geminiAssistant.resolveTripSurfaceForPackScan() : null
 
     const tripContext = draft
-      ? `Destination: ${draft.destinationCity || '-'}, Depart: ${draft.departureDateTime || '-'}, Arrive: ${draft.arrivalDateTime || '-'}, Purpose: ${draft.purpose}`
-      : 'Trip context unavailable.'
+      ? [
+          `Departure city: ${draft.departureCity || '-'}`,
+          `Destination: ${draft.destinationCity || '-'}`,
+          `Depart date: ${draft.departureDateTime || '-'}`,
+          `Arrive date: ${draft.arrivalDateTime || '-'}`,
+          `Purpose: ${draft.purpose}`,
+          '(Cities use User Context when available, otherwise the assistant fallback city such as Berlin.)',
+          draft.voicePreferenceNotes && draft.voicePreferenceNotes.trim().length > 0
+            ? `User notes: ${draft.voicePreferenceNotes.trim()}`
+            : '',
+        ]
+          .filter((s) => s.length > 0)
+          .join('\n')
+      : 'Trip context unavailable (assign GeminiAssistant). Use generic temperate-climate packing ideas if geography is unknown.'
 
     const observedLine =
       observed.length > 0
-        ? `Observed packed items (user-provided): ${observed}`
-        : 'Observed packed items unavailable.'
+        ? `User-listed items (if any): ${observed}`
+        : 'No separate typed item list was provided.'
+
+    const planSnippet = this.buildLastPlanPackWeatherSnippet()
+    const weatherStrip = this.buildAccuWeatherSnippet()
 
     return [
-      'You are a practical packing assistant analyzing a photo of someone\'s travel bag (or a cropped region).',
+      'You are a practical packing assistant. The user may send a photo of packed items (luggage, flat lay, or shelf).',
+      'Trip context:',
       tripContext,
       observedLine,
-      'When the image is provided, ground every observation in items you can actually see. Do not invent items.',
-      'Return concise plain text with 3 short sections, separated by blank lines:',
-      '1) Good to go (items you see that suit the trip)',
-      '2) Missing or risky (gaps for destination weather, dress code, regulations)',
-      '3) Quick additions (small, high-value items worth adding)',
-      'Keep under 8 short bullet points total.',
-    ].join('\n')
+      planSnippet.length > 0 ? `Itinerary / plan hints:\n${planSnippet}` : '',
+      weatherStrip.length > 0 ? `Weather context:\n${weatherStrip}` : '',
+      'Describe only what is clearly visible in the image for the first section. Do not invent objects in the photo.',
+      'Use neutral section headings (exactly these three, in order, each followed by your bullets):',
+      'Visible items',
+      'Gaps or risks for this trip',
+      'Suggested additions',
+      'Under "Visible items": list concrete objects you actually see, or a single line like "No packed travel gear visible" if the frame is a room / not luggage.',
+      'Under "Gaps or risks": relate missing gear to the trip context (dates, purpose, destination).',
+      'Under "Suggested additions": ALWAYS give 3–6 specific packing ideas (clothing, toiletries, adapters, documents, gear) grounded in destination, trip purpose, dates/season, and any weather context above — even when nothing travel-related is visible in the photo. Never reply with only "N/A", "none", or an empty section here.',
+      'Keep each section to short bullets; total under 18 lines.',
+    ]
+      .filter((s) => s.length > 0)
+      .join('\n')
+  }
+
+  private buildLastPlanPackWeatherSnippet(): string {
+    if (!this.geminiAssistant) {
+      return ''
+    }
+    const plan = this.geminiAssistant.getLastTripPlan()
+    if (!plan || !plan.cards) {
+      return ''
+    }
+    const lines: string[] = []
+    const weatherCard = plan.cards.weather
+    if (weatherCard && weatherCard.options && weatherCard.options.length > 0) {
+      for (let i = 0; i < weatherCard.options.length && i < 2; i++) {
+        const o = weatherCard.options[i]
+        if (o.weatherPracticalTips) {
+          lines.push(`- Weather tips: ${o.weatherPracticalTips}`)
+        } else if (o.notes) {
+          lines.push(`- Weather: ${o.notes}`)
+        } else if (o.title) {
+          lines.push(`- Weather: ${o.title}`)
+        }
+      }
+    }
+    const packCard = plan.cards.pack
+    if (packCard && packCard.options && packCard.options.length > 0) {
+      for (let i = 0; i < packCard.options.length && i < 4; i++) {
+        const o = packCard.options[i]
+        const hint = o.luggageVisionHint ? ` — ${o.luggageVisionHint}` : ''
+        lines.push(`- Plan item: ${o.title}${hint}`)
+      }
+    }
+    return lines.join('\n')
+  }
+
+  private buildAccuWeatherSnippet(): string {
+    if (!this.weatherAccuBridge) {
+      return ''
+    }
+    try {
+      const s = this.weatherAccuBridge.getLastSummary().trim()
+      return s.length > 0 ? s : ''
+    } catch (e) {
+      return ''
+    }
   }
 
   private extractText(response: any): string {
@@ -455,11 +486,35 @@ export class PackScanController extends BaseScriptComponent {
     return ''
   }
 
-  // ─── UI helpers ────────────────────────────────────────────────────────────
+  /**
+   * Category detail `Text` must live on an **enabled** SceneObject; assigning `.text` when the
+   * owner is disabled can hard-crash some Lens Studio / device builds.
+   */
+  private ensureTextSceneObjectEnabled(text: Text): void {
+    try {
+      const owner = text.getSceneObject()
+      if (owner && !owner.enabled) {
+        owner.enabled = true
+      }
+    } catch (e) {
+      this.log.e(`ensureTextSceneObjectEnabled: ${e}`)
+    }
+  }
 
-  private setHudText(message: string): void {
-    if (this.packHudText) {
-      this.packHudText.text = message
+  /** Pack scan status + results: always `detailBodyText` (same as category detail). */
+  private setPackDetailBody(message: string): void {
+    const target = this.detailBodyText || this.packHudText
+    if (!target) {
+      this.log.e('PackScanController: assign detailBodyText (CategoryDetail_Text).')
+      print('[PackScanController] Assign detailBodyText (CategoryDetail_Text on CategoryDetail_Text_Body).')
+      return
+    }
+    this.ensureTextSceneObjectEnabled(target)
+    try {
+      target.text = message
+    } catch (e) {
+      this.log.e(`setPackDetailBody failed: ${e}`)
+      print(`[PackScanController] setPackDetailBody failed: ${e}`)
     }
   }
 

@@ -1,5 +1,6 @@
 require('LensStudio:TextInputModule')
 
+import Event from 'SpectaclesInteractionKit.lspkg/Utils/Event'
 import { PinchButton } from 'SpectaclesInteractionKit.lspkg/Components/UI/PinchButton/PinchButton'
 import { ToggleButton } from 'SpectaclesInteractionKit.lspkg/Components/UI/ToggleButton/ToggleButton'
 import { ASRQueryController } from './ASRQueryController'
@@ -9,7 +10,7 @@ import { TripDraft } from './TripTypes'
 
 @component
 export class AIAssistantUIBridge extends BaseScriptComponent {
-  private static readonly DATE_HINT = 'dd/mm/yyyy'
+  private static readonly DATE_HINT = 'dd/mm/yyyy or ddmmyyyy'
 
   @input
   @allowUndefined
@@ -23,7 +24,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Voice capture: assign PinchButton under Btn_VoiceMode_Placeholder. Pinch = welcome (once) + start/stop speech-to-text.')
+  @hint('Voice capture: assign PinchButton under Btn_VoiceMode_Placeholder. First pinch = welcome + listen; after each utterance listening restarts automatically (pinch again only to stop or override).')
   startAssistantButton: PinchButton
 
   @input
@@ -53,7 +54,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  @hint('Pinch to confirm current keyboard text entry for active step.')
+  @hint('Pinch to confirm current keyboard text entry for active step. Shown only while keyboard mode is on (hidden during voice-only).')
   keyboardConfirmButton: PinchButton
 
   @input
@@ -85,6 +86,14 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
   private readonly keyboardSteps = ['departure city', 'destination city', 'departure date', 'arrival date']
   private keyboardOptions: any = null
   private textInputPrimed: boolean = false
+  /** Cancels pending `scheduleResumeVoiceListening` callbacks when Voice pinch runs again. */
+  private voiceResumeToken: number = 0
+
+  /** True after at least one voice transcript in this session; avoids auto-opening mic after Plan Trip if user never used voice. */
+  private voiceSessionActive: boolean = false
+
+  /** Fires whenever the keyboard step prompt line updates (for optional TTS via `AssistantTtsController`). */
+  readonly onKeyboardGuidance: Event<string> = new Event<string>()
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -157,6 +166,11 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     this.geminiAssistant.onTripDraftUpdated.add((draft: TripDraft) => {
       this.travelPlannerController?.syncFromTripDraft(draft)
     })
+    this.geminiAssistant.onTripPlanReady.add(() => {
+      if (this.voiceSessionActive) {
+        this.scheduleResumeVoiceListening(0.55)
+      }
+    })
     this.travelPlannerController?.syncFromTripDraft(this.geminiAssistant.getTripDraft())
 
     const voicePinch = this.swapVoiceAndKeyboardPinchButtons ? this.keyboardToggleButton : this.startAssistantButton
@@ -170,6 +184,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
     if (voicePinch) {
       voicePinch.onButtonPinched.add(() => {
+        this.voiceResumeToken++
         if (this.keyboardModeEnabled) {
           this.dismissTripKeyboard()
           this.keyboardModeEnabled = false
@@ -220,7 +235,10 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
 
     if (this.clearInputsButton) {
       this.clearInputsButton.onButtonPinched.add(() => {
+        this.voiceResumeToken++
+        this.voiceSessionActive = false
         this.keyboardModeEnabled = false
+        this.keyboardStepIndex = 0
         this.dismissTripKeyboard()
         if (this.asrQueryController && this.asrQueryController.getIsRecording()) {
           this.asrQueryController.toggleRecording()
@@ -242,17 +260,47 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
       return
     }
 
+    this.voiceSessionActive = true
     const normalized = query.toLowerCase().trim()
     this.geminiAssistant.handleSpeechTranscript(query)
     this.setHint(query.trim())
 
-    if (
+    const triggeredPlan =
       normalized.indexOf('plan my trip') >= 0 ||
       normalized.indexOf('show options') >= 0 ||
       normalized.indexOf('find options') >= 0
-    ) {
+    if (triggeredPlan) {
       this.geminiAssistant.requestTripPlan()
     }
+
+    if (!this.keyboardModeEnabled && this.asrQueryController && !this.asrQueryController.getMicMuted()) {
+      if (!triggeredPlan) {
+        this.scheduleResumeVoiceListening(0.32)
+      }
+    }
+  }
+
+  /** After ASR finalizes, briefly wait then start listening again so the user need not pinch Voice Mode every turn. */
+  private scheduleResumeVoiceListening(delaySec: number): void {
+    if (!this.asrQueryController || this.asrQueryController.getMicMuted()) {
+      return
+    }
+    this.voiceResumeToken++
+    const token = this.voiceResumeToken
+    const delayed = this.createEvent('DelayedCallbackEvent')
+    delayed.bind(() => {
+      if (token !== this.voiceResumeToken) {
+        return
+      }
+      if (this.keyboardModeEnabled || !this.asrQueryController || this.asrQueryController.getMicMuted()) {
+        return
+      }
+      if (this.asrQueryController.getIsRecording()) {
+        return
+      }
+      this.asrQueryController.toggleRecording()
+    })
+    delayed.reset(delaySec)
   }
 
   private setHint(message: string): void {
@@ -262,6 +310,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
   }
 
   private enterKeyboardMode(): void {
+    this.voiceResumeToken++
     if (this.asrQueryController && this.asrQueryController.getIsRecording()) {
       this.asrQueryController.toggleRecording()
     }
@@ -269,6 +318,9 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     this.dismissTripKeyboard()
     this.keyboardModeEnabled = true
     this.keyboardStepIndex = 0
+    if (this.keyboardEntryText) {
+      this.keyboardEntryText.text = ''
+    }
     this.setKeyboardPrompt('Keyboard mode ON. Enter departure city, then pinch Confirm.')
     this.updateKeyboardUi()
     this.requestTripKeyboard()
@@ -278,6 +330,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     if (this.keyboardModeRoot) {
       this.keyboardModeRoot.enabled = this.keyboardModeEnabled
     }
+    this.setKeyboardConfirmVisible(this.keyboardModeEnabled)
     if (!this.keyboardModeEnabled) {
       return
     }
@@ -305,19 +358,21 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     } else if (this.keyboardStepIndex === 1) {
       draft.destinationCity = entry
     } else if (this.keyboardStepIndex === 2) {
-      if (!this.isDateDdMmYyyy(entry)) {
-        this.setKeyboardPrompt(`Use ${AIAssistantUIBridge.DATE_HINT} format for departure date.`)
+      const normalizedDate = this.normalizeDateToDdMmYyyy(entry)
+      if (!normalizedDate) {
+        this.setKeyboardPrompt(`Use ${AIAssistantUIBridge.DATE_HINT} for departure date (example: 15/05/2026 or 15052026).`)
         this.requestTripKeyboard()
         return
       }
-      draft.departureDateTime = entry
+      draft.departureDateTime = normalizedDate
     } else if (this.keyboardStepIndex === 3) {
-      if (!this.isDateDdMmYyyy(entry)) {
-        this.setKeyboardPrompt(`Use ${AIAssistantUIBridge.DATE_HINT} format for arrival date.`)
+      const normalizedDate = this.normalizeDateToDdMmYyyy(entry)
+      if (!normalizedDate) {
+        this.setKeyboardPrompt(`Use ${AIAssistantUIBridge.DATE_HINT} for arrival date (example: 20/05/2026 or 20052026).`)
         this.requestTripKeyboard()
         return
       }
-      draft.arrivalDateTime = entry
+      draft.arrivalDateTime = normalizedDate
     }
     this.geminiAssistant.notifyTripDraftChanged()
     if (this.keyboardEntryText) {
@@ -332,7 +387,7 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
       return
     }
     this.updateKeyboardUi()
-    this.requestTripKeyboard()
+    this.scheduleKeyboardRefocusAfterStep()
   }
 
   private setKeyboardPrompt(message: string): void {
@@ -341,15 +396,73 @@ export class AIAssistantUIBridge extends BaseScriptComponent {
     } else {
       this.setHint(message)
     }
+    if (message && message.length > 0) {
+      this.onKeyboardGuidance.invoke(message)
+    }
   }
 
-  private isDateDdMmYyyy(value: string): boolean {
-    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-    if (!match) {
-      return false
+  /**
+   * Confirm is keyboard-only: hide/disable the PinchButton unless keyboard flow is active
+   * so it does not sit on screen during voice-only use.
+   */
+  private setKeyboardConfirmVisible(visible: boolean): void {
+    if (!this.keyboardConfirmButton) {
+      return
     }
-    const day = parseInt(match[1], 10)
-    const month = parseInt(match[2], 10)
+    try {
+      this.keyboardConfirmButton.getSceneObject().enabled = visible
+    } catch (e) {
+      print(`[AIAssistantUIBridge] setKeyboardConfirmVisible: ${e}`)
+    }
+  }
+
+  /**
+   * Dismiss then re-open the AR keyboard after a short delay so the OS buffer does not
+   * repopulate the previous step's text (e.g. "Tokyo" still showing on the date step).
+   */
+  private scheduleKeyboardRefocusAfterStep(): void {
+    this.dismissTripKeyboard()
+    if (this.keyboardEntryText) {
+      this.keyboardEntryText.text = ''
+    }
+    const delayed = this.createEvent('DelayedCallbackEvent')
+    delayed.bind(() => {
+      if (this.keyboardModeEnabled) {
+        this.requestTripKeyboard()
+      }
+    })
+    delayed.reset(0.12)
+  }
+
+  /** Accepts `dd/mm/yyyy` or eight digits `ddmmyyyy` → normalized `dd/mm/yyyy`. */
+  private normalizeDateToDdMmYyyy(raw: string): string | null {
+    const value = raw.trim()
+    const slash = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+    if (slash) {
+      const day = parseInt(slash[1], 10)
+      const month = parseInt(slash[2], 10)
+      if (!this.isPlausibleDayMonth(day, month)) {
+        return null
+      }
+      return `${slash[1]}/${slash[2]}/${slash[3]}`
+    }
+    const compact = value.match(/^(\d{8})$/)
+    if (!compact) {
+      return null
+    }
+    const s = compact[1]
+    const dd = s.substring(0, 2)
+    const mm = s.substring(2, 4)
+    const yyyy = s.substring(4, 8)
+    const day = parseInt(dd, 10)
+    const month = parseInt(mm, 10)
+    if (!this.isPlausibleDayMonth(day, month)) {
+      return null
+    }
+    return `${dd}/${mm}/${yyyy}`
+  }
+
+  private isPlausibleDayMonth(day: number, month: number): boolean {
     return day >= 1 && day <= 31 && month >= 1 && month <= 12
   }
 }
