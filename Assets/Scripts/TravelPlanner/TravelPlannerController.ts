@@ -123,6 +123,9 @@ export class TravelPlannerController extends BaseScriptComponent {
       this.trip.setOccasion(label)
       this.syncOccasionToAssistant(label)
       if (this.geminiAssistant) {
+        this.geminiAssistant.markPurposeChosen()
+      }
+      if (this.geminiAssistant) {
         this.geminiAssistant.notifyTripDraftChanged()
       } else {
         this.refreshSummary()

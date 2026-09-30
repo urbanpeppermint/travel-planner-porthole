@@ -3,7 +3,11 @@ import NativeLogger from 'SpectaclesInteractionKit.lspkg/Utils/NativeLogger'
 import { Gemini } from 'RemoteServiceGateway.lspkg/HostedExternal/GoogleGenAI'
 import { GoogleGenAITypes } from 'RemoteServiceGateway.lspkg/HostedExternal/GoogleGenAITypes'
 import { DestinationVisualizer } from './DestinationVisualizer'
+import { normalizeTripPlanPriceFields, PLAN_PRICE_FORMAT_REVISION } from './PlanPriceFormat'
 import { TripDraft, TripPlanResponse, TripPlanningCategory, TripPurpose } from './TripTypes'
+
+/** Which trip draft field a voice utterance is correcting (scoped parse). */
+type TripDraftFieldFocus = 'departureCity' | 'destinationCity' | 'departureDateTime' | 'arrivalDateTime'
 
 /**
  * Voice-first trip intake orchestrator.
@@ -67,6 +71,411 @@ export class GeminiAssistant extends BaseScriptComponent {
     'sunday',
   ])
 
+  /**
+   * Words that must never become origin/destination (UI labels, verbs, fillers, generic geography).
+   * Real places can be small towns; this list targets speech/UI noise like "continue" or "plan my trip".
+   */
+  private static readonly NON_PLACE_WORDS = new Set<string>([
+    'a',
+    'an',
+    'the',
+    'and',
+    'or',
+    'but',
+    'so',
+    'if',
+    'then',
+    'than',
+    'as',
+    'at',
+    'by',
+    'for',
+    'of',
+    'in',
+    'on',
+    'up',
+    'out',
+    'off',
+    'over',
+    'into',
+    'i',
+    'me',
+    'my',
+    'mine',
+    'we',
+    'our',
+    'you',
+    'your',
+    'he',
+    'she',
+    'it',
+    'they',
+    'them',
+    'this',
+    'that',
+    'these',
+    'those',
+    'here',
+    'there',
+    'where',
+    'when',
+    'what',
+    'which',
+    'who',
+    'how',
+    'why',
+    'yes',
+    'no',
+    'yeah',
+    'yep',
+    'nope',
+    'ok',
+    'okay',
+    'please',
+    'thanks',
+    'thank',
+    'sorry',
+    'um',
+    'uh',
+    'hmm',
+    'like',
+    'just',
+    'also',
+    'still',
+    'already',
+    'again',
+    'maybe',
+    'probably',
+    'actually',
+    'really',
+    'very',
+    'quite',
+    'about',
+    'around',
+    'some',
+    'any',
+    'all',
+    'more',
+    'less',
+    'much',
+    'many',
+    'few',
+    'other',
+    'another',
+    'same',
+    'such',
+    'only',
+    'even',
+    'ever',
+    'never',
+    'always',
+    'now',
+    'later',
+    'soon',
+    'today',
+    'tomorrow',
+    'tonight',
+    'yesterday',
+    'continue',
+    'continuing',
+    'confirm',
+    'cancel',
+    'close',
+    'submit',
+    'done',
+    'skip',
+    'next',
+    'back',
+    'forward',
+    'start',
+    'stop',
+    'begin',
+    'end',
+    'finish',
+    'proceed',
+    'retry',
+    'tap',
+    'pinch',
+    'press',
+    'button',
+    'voice',
+    'keyboard',
+    'mode',
+    'mute',
+    'listen',
+    'listening',
+    'record',
+    'recording',
+    'capture',
+    'scan',
+    'plan',
+    'planned',
+    'planning',
+    'trip',
+    'travel',
+    'traveling',
+    'travelling',
+    'options',
+    'option',
+    'generate',
+    'generating',
+    'show',
+    'find',
+    'search',
+    'book',
+    'booking',
+    'check',
+    'see',
+    'look',
+    'want',
+    'need',
+    'help',
+    'tell',
+    'say',
+    'said',
+    'speak',
+    'talk',
+    'ask',
+    'give',
+    'get',
+    'got',
+    'make',
+    'made',
+    'take',
+    'took',
+    'put',
+    'let',
+    'try',
+    'use',
+    'using',
+    'used',
+    'go',
+    'going',
+    'gone',
+    'went',
+    'come',
+    'coming',
+    'leave',
+    'leaving',
+    'left',
+    'depart',
+    'departing',
+    'departure',
+    'arrive',
+    'arriving',
+    'arrival',
+    'return',
+    'returning',
+    'fly',
+    'flying',
+    'flight',
+    'flights',
+    'drive',
+    'driving',
+    'train',
+    'bus',
+    'stay',
+    'staying',
+    'visit',
+    'visiting',
+    'explore',
+    'exploring',
+    'local',
+    'abroad',
+    'overseas',
+    'home',
+    'work',
+    'office',
+    'airport',
+    'hotel',
+    'city',
+    'town',
+    'country',
+    'state',
+    'region',
+    'area',
+    'place',
+    'destination',
+    'origin',
+    'route',
+    'way',
+    'long',
+    'haul',
+    'distance',
+    'transport',
+    'transportation',
+    'accommodation',
+    'restaurant',
+    'restaurants',
+    'weather',
+    'pack',
+    'packing',
+    'category',
+    'categories',
+    'detail',
+    'details',
+    'summary',
+    'leisure',
+    'business',
+    'bleisure',
+    'purpose',
+    'adult',
+    'adults',
+    'kid',
+    'kids',
+    'child',
+    'children',
+    'family',
+    'solo',
+    'couple',
+    'friend',
+    'friends',
+    'correct',
+    'wrong',
+    'right',
+    'change',
+    'update',
+    'edit',
+    'fix',
+    'mean',
+    'meant',
+    'instead',
+    'rather',
+    'prefer',
+    'favorite',
+    'favourite',
+    'best',
+    'cheap',
+    'cheapest',
+    'budget',
+    'expensive',
+    'short',
+    'quick',
+    'fast',
+    'slow',
+    'early',
+    'late',
+    'morning',
+    'afternoon',
+    'evening',
+    'night',
+    'midnight',
+    'noon',
+    'am',
+    'pm',
+    'oclock',
+    "o'clock",
+    'half',
+    'quarter',
+    'week',
+    'weeks',
+    'weekend',
+    'month',
+    'months',
+    'year',
+    'years',
+    'day',
+    'days',
+    'night',
+    'nights',
+    'hour',
+    'hours',
+    'minute',
+    'minutes',
+    'first',
+    'second',
+    'third',
+    'fourth',
+    'fifth',
+    'sixth',
+    'seventh',
+    'eighth',
+    'ninth',
+    'tenth',
+    'eleventh',
+    'twelfth',
+    'thirteenth',
+    'fourteenth',
+    'fifteenth',
+    'sixteenth',
+    'seventeenth',
+    'eighteenth',
+    'nineteenth',
+    'twentieth',
+    'thirtieth',
+    'thirty',
+    'forty',
+    'fifty',
+    'sixty',
+    'seventy',
+    'eighty',
+    'ninety',
+    'hundred',
+    'thousand',
+    'one',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+    'eight',
+    'nine',
+    'ten',
+    'eleven',
+    'twelve',
+    'thirteen',
+    'fourteen',
+    'fifteen',
+    'sixteen',
+    'seventeen',
+    'eighteen',
+    'nineteen',
+    'twenty',
+  ])
+
+  /** Two-letter tokens that are valid map-style place abbreviations when spoken alone. */
+  private static readonly PLACE_SHORT_CODES = new Set<string>(['la', 'ny', 'dc', 'sf', 'uk', 'us', 'eu', 'hk', 'sg', 'ae'])
+
+  /**
+   * Single-word place prefixes that need a second token (e.g. "New" alone is not a city).
+   */
+  private static readonly WEAK_SINGLE_PLACE_WORDS = new Set<string>([
+    'new',
+    'old',
+    'san',
+    'los',
+    'las',
+    'saint',
+    'st',
+    'port',
+    'lake',
+    'fort',
+    'ft',
+    'cape',
+    'mount',
+    'north',
+    'south',
+    'east',
+    'west',
+    'central',
+    'downtown',
+    'grand',
+    'little',
+    'big',
+    'upper',
+    'lower',
+    'el',
+    'la',
+    'le',
+    'de',
+    'del',
+    'von',
+    'bad',
+    'great',
+    'greater',
+  ])
+
   /** Single-token captures that are never valid calendar values (regex / ASR glitches). */
   private static readonly SPEECH_DATE_NOISE_WORDS = new Set<string>([
     'month',
@@ -83,7 +492,7 @@ export class GeminiAssistant extends BaseScriptComponent {
 
   @input
   @hint('Gemini model id for generateContent (e.g. gemini-2.0-flash).')
-  geminiModel: string = 'gemini-2.0-flash'
+  geminiModel: string = 'gemini-2.5-flash-lite'
 
   @input
   @allowUndefined
@@ -118,8 +527,10 @@ export class GeminiAssistant extends BaseScriptComponent {
   planningCategories: string[] = ['transportation', 'accommodation', 'places', 'restaurants', 'weather', 'pack']
 
   @input
-  @hint('Fallback city for location prompt when location services do not provide one.')
-  fallbackDepartureCity: string = 'Berlin'
+  @hint(
+    'Optional editor-only city when User Context is unavailable. Leave empty to avoid defaulting departure to a fixed city.',
+  )
+  fallbackDepartureCity: string = ''
 
   @input
   @hint('If destination is missing, default it to current user city for local explore mode.')
@@ -140,9 +551,10 @@ export class GeminiAssistant extends BaseScriptComponent {
   readonly onTripPlanReady: Event<TripPlanResponse> = new Event<TripPlanResponse>()
 
   private tripDraft: TripDraft = this.createEmptyDraft()
-  private waitingForDepartureCityConfirmation: boolean = false
   /** After the first in-context welcome, further Voice pinches only refresh listening hints (no state reset). */
   private voiceWelcomeCommitted: boolean = false
+  /** Avoid repeating the plan-trip CTA on every utterance while the draft is already complete. */
+  private planReadyHintShown: boolean = false
   private detectedDepartureCity: string = ''
   private currentUserName: string = 'Traveler'
   private userContextResolved: boolean = false
@@ -161,17 +573,26 @@ export class GeminiAssistant extends BaseScriptComponent {
 
   beginAssistantSession(userName: string, detectedDepartureCity: string): string {
     this.currentUserName = userName && userName.length > 0 ? userName : 'Traveler'
-    this.detectedDepartureCity =
-      detectedDepartureCity && detectedDepartureCity.length > 0 ? detectedDepartureCity : this.fallbackDepartureCity
-    this.waitingForDepartureCityConfirmation = true
-    if (this.tripDraft.departureCity.length === 0) {
-      this.tripDraft.departureCity = this.detectedDepartureCity
+    if (detectedDepartureCity && detectedDepartureCity.trim().length > 0) {
+      this.detectedDepartureCity = detectedDepartureCity.trim()
     }
+    this.planReadyHintShown = false
     this.publishSummary()
 
-    const prompt = `Hey ${this.getPreferredUserLabel()}, are you planning to travel from ${this.detectedDepartureCity}?`
+    const prompt = `Hey ${this.getPreferredUserLabel()}, tell me your departure city, destination, and departure and return dates. Say "use my current location" if you want your departure city from GPS.`
     this.setStatus(prompt)
     this.onPromptGenerated.invoke(prompt)
+    return prompt
+  }
+
+  /** Lens-open hello so TripOptic is clearly an assisted experience. Does not start the trip form. */
+  greetTripOptic(): string {
+    const label = this.getPreferredUserLabel()
+    const named = label.length > 0 && label !== 'Traveler'
+    const prompt = named
+      ? `Welcome to TripOptic, ${label}. I'm your assistant — pinch Ask TripOptic and I'll help with this trip.`
+      : `Welcome to TripOptic. I'm your assistant — pinch Ask TripOptic and I'll help with this trip.`
+    this.setStatus(prompt)
     return prompt
   }
 
@@ -181,9 +602,6 @@ export class GeminiAssistant extends BaseScriptComponent {
   beginAssistantSessionFromContext(): string {
     if (this.currentUserName.length === 0) {
       this.currentUserName = 'Traveler'
-    }
-    if (this.detectedDepartureCity.length === 0) {
-      this.detectedDepartureCity = this.fallbackDepartureCity
     }
     if (!this.voiceWelcomeCommitted) {
       this.voiceWelcomeCommitted = true
@@ -196,8 +614,8 @@ export class GeminiAssistant extends BaseScriptComponent {
 
   /** Short line for VoiceHint when user re-opens the mic after the welcome pass. */
   getVoiceListeningHint(): string {
-    if (this.waitingForDepartureCityConfirmation) {
-      return `Reply: are you leaving from ${this.detectedDepartureCity}? (yes / no / or say your city.)`
+    if (this.isDraftReady()) {
+      return this.getPlanTripReadyHint()
     }
     return this.getNextMissingPrompt()
   }
@@ -225,31 +643,103 @@ export class GeminiAssistant extends BaseScriptComponent {
     const normalized = transcript.trim()
     const lowered = normalized.toLowerCase()
 
-    if (this.waitingForDepartureCityConfirmation) {
-      if (this.isLocalExploreIntent(lowered)) {
-        this.handleDepartureConfirmation(normalized)
-        return
-      }
-      // User answered the welcome with a full sentence (cities + dates in one go) — do not
-      // block on yes/no; parse everything together.
-      if (this.speechSupersedesDepartureWelcome(lowered)) {
-        this.waitingForDepartureCityConfirmation = false
-        this.tripDraft.skipLongDistanceTransport = false
-      } else {
-        this.handleDepartureConfirmation(normalized)
-        this.publishSummary()
-        return
+    if (this.isPlanTripIntent(lowered)) {
+      this.publishSummary()
+      return
+    }
+
+    if (this.tripOpticOpen || this.isTravelQuestion(lowered)) {
+      this.answerTravelerQuestion(normalized)
+      return
+    }
+
+    if (this.isLocalExploreIntent(lowered)) {
+      this.tripDraft.skipLongDistanceTransport = true
+      const loc = this.getResolvedUserLocationCity()
+      if (loc.length > 0) {
+        this.tripDraft.departureCity = loc
+        this.tripDraft.destinationCity = loc
       }
     }
 
-    this.extractTripFields(normalized)
-    this.publishSummary()
-
-    if (this.isDraftReady()) {
-      this.setStatus('Trip details captured. Say "plan my trip" to generate options.')
+    const fieldFocus = this.detectSpeechFieldFocus(lowered)
+    if (fieldFocus) {
+      this.extractTripFieldsScoped(normalized, fieldFocus)
     } else {
-      this.setStatus(this.getNextMissingPrompt())
+      this.extractTripFields(normalized)
     }
+    this.publishSummary()
+    this.updateStatusAfterSpeech(fieldFocus)
+  }
+
+  /** A request for advice, not a line that only fills the trip form. */
+  private isTravelQuestion(text: string): boolean {
+    if (text.indexOf('?') >= 0) {
+      return true
+    }
+    const cues = [
+      'show me',
+      'restaurant',
+      'lunch',
+      'dinner',
+      'breakfast',
+      'where ',
+      'what ',
+      'how ',
+      'which ',
+      'recommend',
+      'nearby',
+      'near me',
+      'address',
+      'to eat',
+      'good food',
+      'cafe',
+      'coffee',
+    ]
+    for (let i = 0; i < cues.length; i++) {
+      if (text.indexOf(cues[i]) >= 0) {
+        return true
+      }
+    }
+    return false
+  }
+
+  /**
+   * Conversational help. Does not write cities or dates into the draft.
+   */
+  private answerTravelerQuestion(question: string): void {
+    if (question.length === 0) {
+      this.setStatus('Ask a travel question after the word ask.')
+      return
+    }
+    const draft = JSON.stringify(this.tripDraft)
+    const prompt = [
+      'You are TripOptic, a calm travel assistant on AR glasses.',
+      'Answer the traveler in at most 4 short lines. Do this even when no trip plan exists.',
+      'No JSON. No markdown. Do not ask them to start a trip plan.',
+      'If they name a place, recommend for that place. If a draft exists, you may use it.',
+      'Do not invent a live map route.',
+      `Trip draft: ${draft}`,
+      `Question: ${question}`,
+    ].join('\n')
+    const geminiRequest: GoogleGenAITypes.Gemini.Models.GenerateContentRequest = {
+      model: this.geminiModel,
+      type: 'generateContent',
+      body: {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.4 },
+      },
+    }
+    this.setStatus('One moment.')
+    Gemini.models(geminiRequest)
+      .then((response) => {
+        const text = this.extractTextFromGenerateContentResponse(response)
+        this.setStatus(text && text.length > 0 ? text.trim() : 'I could not answer that. Try a shorter question.')
+      })
+      .catch((error) => {
+        this.log.e(`Ask failed: ${error}`)
+        this.setStatus('Could not reach Gemini for that question.')
+      })
   }
 
   requestTripPlan(): void {
@@ -284,6 +774,7 @@ export class GeminiAssistant extends BaseScriptComponent {
       },
     }
 
+    this.planReadyHintShown = false
     this.setStatus('Generating trip options via Gemini (RSG Sync)...')
     this.setGeneratingLoading(true)
 
@@ -347,21 +838,17 @@ export class GeminiAssistant extends BaseScriptComponent {
    * Dates use localized fallback when empty so pack scan always has a calendar anchor.
    */
   resolveTripSurfaceForPackScan(): TripDraft {
-    const fb =
-      this.fallbackDepartureCity && this.fallbackDepartureCity.trim().length > 0
-        ? this.fallbackDepartureCity.trim()
-        : 'Berlin'
     const detected = this.detectedDepartureCity ? this.detectedDepartureCity.trim() : ''
     let dep = this.tripDraft.departureCity.trim()
-    if (!dep) {
-      dep = detected.length > 0 ? detected : fb
+    if (!dep && detected.length > 0) {
+      dep = detected
     }
     let dest = this.tripDraft.destinationCity.trim()
-    if (!dest && this.defaultDestinationToCurrentCity) {
-      dest = dep.length > 0 ? dep : fb
+    if (!dest && this.defaultDestinationToCurrentCity && dep.length > 0) {
+      dest = dep
     }
-    if (!dest) {
-      dest = dep.length > 0 ? dep : detected.length > 0 ? detected : fb
+    if (!dest && detected.length > 0) {
+      dest = detected
     }
     const dateFb = this.getLocalizedDateFallback()
     return {
@@ -393,8 +880,9 @@ export class GeminiAssistant extends BaseScriptComponent {
   resetTripDraft(): void {
     this.tripDraft = this.createEmptyDraft()
     this.lastTripPlan = null
-    this.waitingForDepartureCityConfirmation = false
+    this.purposeChosen = false
     this.voiceWelcomeCommitted = false
+    this.planReadyHintShown = false
     this.disableCategoryWidgets()
     this.publishSummary()
     this.setStatus('Trip draft cleared.')
@@ -429,22 +917,15 @@ export class GeminiAssistant extends BaseScriptComponent {
       )
       this.userContextResolved = true
       this.resolveSyncKitIdentitySafe()
+      this.triggerDestinationPreview()
       return
     }
 
     const userContext = (global as any).userContextSystem
-    if (!userContext || typeof userContext.requestCity !== 'function') {
-      print('[GeminiAssistant] userContextSystem.requestCity not available; using fallback city.')
-      this.userContextResolved = true
-      this.resolveSyncKitIdentitySafe()
-      return
-    }
-
     const self = this
 
     try {
-      if (typeof userContext.requestDisplayName === 'function') {
-        // Plain function callback — some hosts reject arrow / non-native closures for native APIs.
+      if (userContext && typeof userContext.requestDisplayName === 'function') {
         userContext.requestDisplayName(function (name: string) {
           if (name && name.length > 0) {
             self.currentUserName = name
@@ -455,45 +936,36 @@ export class GeminiAssistant extends BaseScriptComponent {
       print(`[GeminiAssistant] requestDisplayName skipped: ${e}`)
     }
 
-    try {
-      userContext.requestCity(function (city: string) {
-        if (city && city.length > 0) {
-          self.detectedDepartureCity = city
-          if (self.tripDraft.departureCity.length === 0) {
-            self.tripDraft.departureCity = city
-          }
-          self.publishSummary()
-        }
-      })
-    } catch (e) {
-      print(`[GeminiAssistant] requestCity skipped: ${e}`)
-      this.applyFallbackUserContext()
-    }
-
+    // `requestCity` needs ProcessedLocationModule. SnapOS denies that permission
+    // whenever the Lens also uses Internet / Remote APIs (Places, Imagen, Maps).
+    // Walking GPS still uses RawLocationModule on the map.
+    print('[GeminiAssistant] skipping requestCity (processed_location + internet). Using fallback city.')
     this.userContextResolved = true
     this.resolveSyncKitIdentitySafe()
+    this.triggerDestinationPreview()
   }
 
   private applyFallbackUserContext(): void {
-    if (this.detectedDepartureCity.length === 0) {
-      this.detectedDepartureCity = this.fallbackDepartureCity
-    }
-    if (this.tripDraft.departureCity.length === 0) {
-      this.tripDraft.departureCity = this.detectedDepartureCity
+    const fb = this.fallbackDepartureCity ? this.fallbackDepartureCity.trim() : ''
+    if (this.detectedDepartureCity.length === 0 && fb.length > 0) {
+      this.detectedDepartureCity = fb
     }
   }
 
   private applyMissingFieldDefaults(): void {
-    if (this.tripDraft.departureCity.length === 0) {
-      this.tripDraft.departureCity =
-        this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
-    }
-
     if (this.defaultDestinationToCurrentCity && this.tripDraft.destinationCity.length === 0) {
-      this.tripDraft.destinationCity = this.tripDraft.departureCity
-      this.setStatus(
-        `Using ${this.tripDraft.destinationCity} as destination for local explore mode (places, food, weather, and pack).`,
-      )
+      const dep = this.tripDraft.departureCity.trim()
+      const detected = this.detectedDepartureCity.trim()
+      if (dep.length > 0) {
+        this.tripDraft.destinationCity = dep
+      } else if (detected.length > 0) {
+        this.tripDraft.destinationCity = detected
+      }
+      if (this.tripDraft.destinationCity.length > 0) {
+        this.setStatus(
+          `Using ${this.tripDraft.destinationCity} as destination for local explore mode (places, food, weather, and pack).`,
+        )
+      }
     }
 
     const fallbackDate = this.getLocalizedDateFallback()
@@ -505,58 +977,250 @@ export class GeminiAssistant extends BaseScriptComponent {
     }
   }
 
-  private handleDepartureConfirmation(transcript: string): void {
-    const lowered = transcript.toLowerCase()
-    if (this.isLocalExploreIntent(lowered)) {
-      this.waitingForDepartureCityConfirmation = false
-      this.tripDraft.skipLongDistanceTransport = true
-      this.tripDraft.departureCity =
-        this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
-      this.tripDraft.destinationCity = this.tripDraft.departureCity
-      this.publishSummary()
-      this.setStatus(
-        'Local mode: skipping long-distance transport. Share dates if you want, or say "plan my trip" for places, food, weather, and pack.',
-      )
-      return
+  private getResolvedUserLocationCity(): string {
+    if (this.detectedDepartureCity && this.detectedDepartureCity.trim().length > 0) {
+      return this.detectedDepartureCity.trim()
+    }
+    const fb = this.fallbackDepartureCity ? this.fallbackDepartureCity.trim() : ''
+    return fb
+  }
+
+  private getPlanTripReadyHint(): string {
+    return 'When you are ready, say "plan my trip" or press the Plan Trip button.'
+  }
+
+  private isPlanTripIntent(lowered: string): boolean {
+    return (
+      lowered.indexOf('plan my trip') >= 0 ||
+      lowered.indexOf('plan the trip') >= 0 ||
+      lowered.indexOf('show options') >= 0 ||
+      lowered.indexOf('find options') >= 0 ||
+      lowered.indexOf('generate options') >= 0
+    )
+  }
+
+  private utteranceHasDateSignal(lowered: string): boolean {
+    const forDates = this.normalizeVoiceDateTokens(lowered)
+    return (
+      /\d/.test(forDates) ||
+      /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|tomorrow|today|tonight)\b/.test(forDates)
+    )
+  }
+
+  /**
+   * When the user corrects one slot ("from Tokyo", "leaving on the 17th"), parse only that field.
+   */
+  private detectSpeechFieldFocus(lowered: string): TripDraftFieldFocus | null {
+    const forDates = this.normalizeVoiceDateTokens(lowered)
+
+    if (
+      /\b(return(?:ing)?|come back|back on|return date|end of trip|trip end)\b/.test(lowered) &&
+      this.utteranceHasDateSignal(forDates)
+    ) {
+      return 'arrivalDateTime'
+    }
+    if (/\b(arriv(?:e|al|ing)|arrival date)\b/.test(lowered) && this.utteranceHasDateSignal(forDates)) {
+      return 'arrivalDateTime'
     }
 
-    if (this.isYes(lowered)) {
-      this.tripDraft.skipLongDistanceTransport = false
-      this.tripDraft.departureCity = this.detectedDepartureCity
-      this.waitingForDepartureCityConfirmation = false
-      this.extractTripFields(transcript)
-      this.publishSummary()
-      this.setStatus(
-        this.isDraftReady()
-          ? 'Trip details captured. Say "plan my trip" to generate options.'
-          : 'Great. Where are you going, and what are your departure and return dates?',
-      )
-      return
+    if (
+      /\b(leav(?:e|ing)|depart(?:ure|ing)?|fly(?:ing)? out|starting on|outbound)\b/.test(lowered) &&
+      (this.utteranceHasDateSignal(forDates) || /\bon\s+(?:the\s+)?\d{1,2}\b/.test(forDates))
+    ) {
+      return 'departureDateTime'
     }
-    if (this.isNo(lowered)) {
-      this.waitingForDepartureCityConfirmation = false
-      this.tripDraft.skipLongDistanceTransport = false
-      this.extractTripFields(transcript)
-      this.publishSummary()
-      this.setStatus('No problem. Tell me which city you are leaving from, then your destination and dates.')
-      return
+    if (/\bdeparture date\b/.test(lowered) && this.utteranceHasDateSignal(forDates)) {
+      return 'departureDateTime'
     }
 
-    const city = this.extractCityAfterKeyword(lowered, 'from')
-    if (city.length > 0) {
-      this.tripDraft.departureCity = city
-      this.waitingForDepartureCityConfirmation = false
-      this.extractTripFields(transcript)
-      this.publishSummary()
-      this.setStatus(
-        this.isDraftReady()
-          ? 'Trip details captured. Say "plan my trip" to generate options.'
-          : this.getNextMissingPrompt(),
-      )
-      return
+    if (/\b(travell?(?:ing)?|leaving|depart(?:ing)?|flying)\s+from\b/.test(lowered)) {
+      return 'departureCity'
+    }
+    if (/\b(origin|departure city)\b/.test(lowered)) {
+      return 'departureCity'
+    }
+    if (/\bfrom\s+[a-z]/.test(lowered) && !/\bfrom\s+[a-z].+\s+to\s+[a-z]/.test(lowered)) {
+      return 'departureCity'
     }
 
-    this.setStatus(`Please say yes/no, or tell me your departure city (for example: "from ${this.fallbackDepartureCity}").`)
+    if (/\b(going to|travel(?:ling)? to|headed to|destination is)\b/.test(lowered)) {
+      const probe = this.expandHereAliasesInCityPhrases(lowered)
+      if (this.extractCityAfterKeyword(probe, 'to').length > 0) {
+        return 'destinationCity'
+      }
+    }
+
+    const isCorrection = /^\s*no\b/.test(lowered) || /\b(actually|correction|wrong|not that|i mean)\b/.test(lowered)
+    if (isCorrection) {
+      if (/\b(leav|depart|fly|start)\b/.test(lowered) && this.utteranceHasDateSignal(forDates)) {
+        return 'departureDateTime'
+      }
+      if (/\b(return|back)\b/.test(lowered) && this.utteranceHasDateSignal(forDates)) {
+        return 'arrivalDateTime'
+      }
+      if (/\bfrom\b/.test(lowered)) {
+        return 'departureCity'
+      }
+      if (/\bto\b/.test(lowered)) {
+        return 'destinationCity'
+      }
+    }
+
+    return null
+  }
+
+  private extractTripFieldsScoped(transcript: string, focus: TripDraftFieldFocus): void {
+    const loweredRaw = transcript.toLowerCase()
+    const lowered = this.normalizeVoiceDateTokens(this.expandHereAliasesInCityPhrases(loweredRaw))
+
+    if (focus === 'departureCity') {
+      this.applyExplicitCurrentLocationPhrases(loweredRaw)
+      const cityPair = this.extractCityPairFromFreeform(lowered)
+      if (cityPair) {
+        this.tripDraft.departureCity = cityPair.from
+      }
+      const fromCity = this.extractCityAfterKeyword(lowered, 'from')
+      if (fromCity.length > 0) {
+        this.tripDraft.departureCity = fromCity
+      }
+    } else if (focus === 'destinationCity') {
+      const cityPair = this.extractCityPairFromFreeform(lowered)
+      if (cityPair) {
+        this.tripDraft.destinationCity = cityPair.to
+        this.triggerDestinationPreview()
+      }
+      const toCity = this.extractCityAfterKeyword(lowered, 'to')
+      if (toCity.length > 0) {
+        this.tripDraft.destinationCity = toCity
+        this.triggerDestinationPreview()
+      }
+    } else if (focus === 'departureDateTime') {
+      const dep = this.extractDepartureDateFromSpeech(lowered)
+      if (dep.length > 0) {
+        this.tripDraft.departureDateTime = dep
+      }
+    } else if (focus === 'arrivalDateTime') {
+      const ret = this.extractReturnDateFromSpeech(lowered)
+      if (ret.length > 0) {
+        this.tripDraft.arrivalDateTime = ret
+      }
+    }
+
+    const purpose = this.extractPurpose(lowered)
+    if (purpose !== '') {
+      this.tripDraft.purpose = purpose
+    }
+
+    this.sanitizeDraftCitiesAndDates(loweredRaw)
+  }
+
+  private updateStatusAfterSpeech(fieldFocus: TripDraftFieldFocus | null): void {
+    if (!this.isDraftReady()) {
+      this.planReadyHintShown = false
+      this.setStatus(this.getNextMissingPrompt())
+      return
+    }
+    if (fieldFocus) {
+      this.setStatus(this.getFieldCorrectedAck(fieldFocus))
+      return
+    }
+    if (!this.planReadyHintShown) {
+      this.planReadyHintShown = true
+      this.setStatus(this.getPlanTripReadyHint())
+    }
+  }
+
+  private getFieldCorrectedAck(focus: TripDraftFieldFocus): string {
+    switch (focus) {
+      case 'departureCity':
+        return `Updated departure city: ${this.tripDraft.departureCity || '—'}. ${this.getPlanTripReadyHint()}`
+      case 'destinationCity':
+        return `Updated destination: ${this.tripDraft.destinationCity || '—'}. ${this.getPlanTripReadyHint()}`
+      case 'departureDateTime':
+        return `Updated departure date: ${this.tripDraft.departureDateTime || '—'}. ${this.getPlanTripReadyHint()}`
+      case 'arrivalDateTime':
+        return `Updated return date: ${this.tripDraft.arrivalDateTime || '—'}. ${this.getPlanTripReadyHint()}`
+      default:
+        return this.getPlanTripReadyHint()
+    }
+  }
+
+  private extractDepartureDateFromSpeech(lowered: string): string {
+    const phrasePatterns = [
+      /\bleaving\s+on\s+/,
+      /\bleave\s+on\s+/,
+      /\bdeparting\s+on\s+/,
+      /\bdepart\s+on\s+/,
+      /\bfly(?:ing)?\s+out\s+on\s+/,
+      /\bstarting\s+on\s+/,
+    ]
+    for (let i = 0; i < phrasePatterns.length; i++) {
+      const d = this.extractDateAfterPhrasePattern(lowered, phrasePatterns[i])
+      if (d.length > 0) {
+        return d
+      }
+    }
+    const keys = ['depart', 'departure', 'leaving', 'leave']
+    for (let k = 0; k < keys.length; k++) {
+      const d2 = this.extractDateTimeAfterKeyword(lowered, keys[k])
+      if (d2.length > 0) {
+        return d2
+      }
+    }
+    const onDay = lowered.match(
+      /\b(?:leav(?:e|ing)|depart(?:ing|ure)?|fly(?:ing)? out)\s+on\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:\s+of)?\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)?/,
+    )
+    if (onDay) {
+      if (onDay[2]) {
+        const parsed = this.parseSpokenMonthDayPair(onDay[2], parseInt(onDay[1], 10))
+        if (parsed.length > 0) {
+          return parsed
+        }
+      }
+      const y = new Date().getFullYear()
+      const d = new Date(y, new Date().getMonth(), parseInt(onDay[1], 10))
+      return this.formatTripCalendarDate(d)
+    }
+    const lone = this.extractLoneMonthDayInUtterance(lowered)
+    return lone || ''
+  }
+
+  private extractReturnDateFromSpeech(lowered: string): string {
+    const phrasePatterns = [
+      /\breturning\s+on\s+/,
+      /\breturn\s+on\s+/,
+      /\bcome back\s+on\s+/,
+      /\bback\s+on\s+/,
+      /\breturn date\s+/,
+    ]
+    for (let i = 0; i < phrasePatterns.length; i++) {
+      const d = this.extractDateAfterPhrasePattern(lowered, phrasePatterns[i])
+      if (d.length > 0) {
+        return d
+      }
+    }
+    const arrive = this.extractDateTimeAfterKeyword(lowered, 'return')
+    if (arrive.length > 0) {
+      return arrive
+    }
+    return this.extractDateTimeAfterKeyword(lowered, 'arrive')
+  }
+
+  private extractDateAfterPhrasePattern(lowered: string, phrasePattern: RegExp): string {
+    const m = lowered.match(phrasePattern)
+    if (!m || m.index === undefined) {
+      return ''
+    }
+    const i0 = m.index + m[0].length
+    let frag = lowered.substring(i0, i0 + 96).trim()
+    const cutIdx = frag.search(/\b(and|but|,|;|from|to|leaving|return)\b/i)
+    if (cutIdx >= 4) {
+      frag = frag.substring(0, cutIdx).trim()
+    }
+    if (!this.isPlausibleSpeechDateFragment(frag)) {
+      return ''
+    }
+    return this.parseLooseSpokenDateFragment(frag)
   }
 
   private extractTripFields(transcript: string): void {
@@ -586,14 +1250,14 @@ export class GeminiAssistant extends BaseScriptComponent {
       this.triggerDestinationPreview()
     }
 
-    const departTime = this.extractDateTimeAfterKeyword(lowered, 'depart')
+    const departTime = this.extractDepartureDateFromSpeech(lowered)
     if (departTime.length > 0) {
       this.tripDraft.departureDateTime = departTime
     }
 
-    const arrivalTime = this.extractDateTimeAfterKeyword(lowered, 'arrive')
-    if (arrivalTime.length > 0) {
-      this.tripDraft.arrivalDateTime = arrivalTime
+    const returnTime = this.extractReturnDateFromSpeech(lowered)
+    if (returnTime.length > 0) {
+      this.tripDraft.arrivalDateTime = returnTime
     }
 
     const dateRange = this.extractDateRangeFromFreeform(lowered)
@@ -635,7 +1299,18 @@ export class GeminiAssistant extends BaseScriptComponent {
     }
 
     this.appendTripPreferenceHintsFromSpeech(transcript)
+    this.sanitizeDraftCitiesAndDates(loweredRaw)
+  }
 
+  /** Clears origin/destination that fail place validation (e.g. ASR captured "Continue"). */
+  private revalidateDraftPlaceFields(): void {
+    const depSan = this.sanitizeCityCandidate(this.tripDraft.departureCity)
+    this.tripDraft.departureCity = depSan || ''
+    const destSan = this.sanitizeCityCandidate(this.tripDraft.destinationCity)
+    this.tripDraft.destinationCity = destSan || ''
+  }
+
+  private sanitizeDraftCitiesAndDates(loweredRaw: string): void {
     const depSan = this.sanitizeCityCandidate(this.tripDraft.departureCity)
     if (!depSan) {
       this.tripDraft.departureCity = ''
@@ -649,7 +1324,7 @@ export class GeminiAssistant extends BaseScriptComponent {
       this.tripDraft.destinationCity = destSan
     }
 
-    const loc = this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
+    const loc = this.getResolvedUserLocationCity()
     if (loc && this.tripDraft.departureCity.toLowerCase() === 'here') {
       this.tripDraft.departureCity = loc
     }
@@ -659,7 +1334,7 @@ export class GeminiAssistant extends BaseScriptComponent {
 
   /** User said "use my current location" etc. — map departure to Lens-detected / fallback city. */
   private applyExplicitCurrentLocationPhrases(lowered: string): void {
-    const loc = this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
+    const loc = this.getResolvedUserLocationCity()
     if (!loc || loc.length === 0) {
       return
     }
@@ -679,7 +1354,7 @@ export class GeminiAssistant extends BaseScriptComponent {
    * Uses lowercase slug words; sanitize / toCityCase later fixes casing.
    */
   private expandHereAliasesInCityPhrases(lowered: string): string {
-    const loc = this.detectedDepartureCity.length > 0 ? this.detectedDepartureCity : this.fallbackDepartureCity
+    const loc = this.getResolvedUserLocationCity()
     if (!loc || loc.length === 0) {
       return lowered
     }
@@ -740,6 +1415,12 @@ export class GeminiAssistant extends BaseScriptComponent {
       'bus',
       'back',
       'way',
+      'plan',
+      'planning',
+      'continue',
+      'start',
+      'want',
+      'need',
     ])
     const direct = t.match(
       /\b([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})\s+to\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+(?:from|for|on|the|starting|leaving|tomorrow|today|next|between|until|return|,|\d|$)|$)/,
@@ -756,31 +1437,6 @@ export class GeminiAssistant extends BaseScriptComponent {
     }
 
     return null
-  }
-
-  /** True when the user is clearly dictating a trip (not a short yes/no) — skip welcome gate. */
-  private speechSupersedesDepartureWelcome(lowered: string): boolean {
-    const forCities = this.expandHereAliasesInCityPhrases(lowered)
-    const forDates = this.normalizeVoiceDateTokens(forCities)
-    if (this.extractCityPairFromFreeform(forCities)) {
-      return true
-    }
-    if (this.extractDateRangeFromFreeform(forDates)) {
-      return true
-    }
-    if (this.extractRelativeDateRange(forDates)) {
-      return true
-    }
-    if (/\bfrom\s+[a-z][a-z'\-]{1,28}\s+to\s+[a-z]/.test(forCities)) {
-      return true
-    }
-    if (/\b(depart|departure|return(?:ing)?|arriv(?:e|ing)?|until)\b/.test(lowered) && /\d/.test(forDates)) {
-      return true
-    }
-    if (/\bfrom here to\b/.test(lowered) || /\b(use my current location|my current location)\b/.test(lowered)) {
-      return true
-    }
-    return false
   }
 
   private addCalendarDays(base: Date, days: number): Date {
@@ -972,21 +1628,26 @@ export class GeminiAssistant extends BaseScriptComponent {
     return null
   }
 
+  private previewCityShown: string = ''
+
+  /** GPS city until a destination is set. One image per city, not on every utterance. */
   private triggerDestinationPreview(): void {
-    if (!this.destinationVisualizer || this.tripDraft.destinationCity.length === 0) {
+    if (!this.destinationVisualizer) {
       return
     }
-    this.destinationVisualizer.generateDestinationImage(
-      this.tripDraft.destinationCity,
-      this.tripDraft.purpose,
-      'clear skies',
-      (base64) => {
-        if (!base64 || base64.length === 0) {
-          return
-        }
-        this.destinationVisualizer.applyToPlanes(base64, this.tripDraft.destinationCity)
-      },
-    )
+    const dest = this.tripDraft.destinationCity.trim()
+    const detected = this.getDetectedCity()
+    const city = dest.length > 0 ? dest : detected
+    if (city.length === 0 || city === 'Here' || city === this.previewCityShown) {
+      return
+    }
+    this.previewCityShown = city
+    this.destinationVisualizer.generateDestinationImage(city, this.tripDraft.purpose, 'clear skies', (base64) => {
+      if (!base64 || base64.length === 0) {
+        return
+      }
+      this.destinationVisualizer.applyToPlanes(base64, city)
+    })
   }
 
   private applyPlanToWidgets(response: TripPlanResponse): void {
@@ -999,7 +1660,7 @@ export class GeminiAssistant extends BaseScriptComponent {
       if (text) {
         const category = categories[i]
         const title = this.buildCategoryTitle(category, response)
-        text.text = `${title}  ›`
+        text.text = `${title}  ›\n${this.categorySubtitle(category)}`
       }
     }
   }
@@ -1007,37 +1668,117 @@ export class GeminiAssistant extends BaseScriptComponent {
   private buildCategoryTitle(category: TripPlanningCategory, response: TripPlanResponse): string {
     const cards = response.cards || {}
     const card = cards[category]
+    const name = this.categoryShortName(category)
     if (!card) {
-      return this.capitalize(category)
+      return name
     }
     const count = card.options ? card.options.length : 0
-    return `${this.capitalize(category)} (${count})`
+    return `${name} (${count})`
+  }
+
+  private categoryShortName(category: TripPlanningCategory): string {
+    switch (category) {
+      case 'accommodation':
+        return 'Stay'
+      case 'transportation':
+        return 'Transport'
+      case 'restaurants':
+        return 'Food'
+      default:
+        return this.capitalize(category)
+    }
+  }
+
+  private categorySubtitle(category: TripPlanningCategory): string {
+    switch (category) {
+      case 'accommodation':
+        return 'Hotels & stays'
+      case 'transportation':
+        return 'Flights & transit'
+      case 'places':
+        return 'Attractions & culture'
+      case 'restaurants':
+        return 'Restaurants & cuisine'
+      case 'weather':
+        return 'Forecast & tips'
+      case 'pack':
+        return 'Checklist & scan'
+      default:
+        return ''
+    }
+  }
+
+  /** Pinch the TripOptic control to talk about the trip without changing the draft. */
+  private tripOpticOpen: boolean = false
+
+  setTripOpticOpen(open: boolean): void {
+    this.tripOpticOpen = open
+    this.setStatus(open ? 'TripOptic is on. Ask about this trip.' : 'TripOptic is off. Voice fills the trip again.')
+  }
+
+  isTripOpticOpen(): boolean {
+    return this.tripOpticOpen
+  }
+
+  /** True only after the traveler pinches Leisure, Business, or Bleisure. */
+  private purposeChosen: boolean = false
+
+  markPurposeChosen(): void {
+    this.purposeChosen = true
+    this.publishSummary()
+  }
+
+  isPurposeChosen(): boolean {
+    return this.purposeChosen
+  }
+
+  /** City from Snap User Context, or the inspector fallback. */
+  getDetectedCity(): string {
+    const detected = this.detectedDepartureCity ? this.detectedDepartureCity.trim() : ''
+    if (detected.length > 0) {
+      return detected
+    }
+    const fb = this.fallbackDepartureCity ? this.fallbackDepartureCity.trim() : ''
+    return fb.length > 0 ? fb : 'Here'
   }
 
   private publishSummary(): void {
+    this.revalidateDraftPlaceFields()
     if (this.summaryText) {
-      const lines = [
-        `From: ${this.tripDraft.departureCity.length > 0 ? this.tripDraft.departureCity : '—'}`,
-        `To: ${this.tripDraft.destinationCity.length > 0 ? this.tripDraft.destinationCity : '—'}`,
-        `Depart: ${this.tripDraft.departureDateTime.length > 0 ? this.tripDraft.departureDateTime : '—'}`,
-        `Arrive: ${this.tripDraft.arrivalDateTime.length > 0 ? this.tripDraft.arrivalDateTime : '—'}`,
-        `Purpose: ${this.tripDraft.purpose.length > 0 ? this.tripDraft.purpose : 'leisure'}`,
-        `Transport: ${this.tripDraft.skipLongDistanceTransport ? 'local only (no long-haul)' : 'include long-distance'}`,
-      ]
-      if (this.tripDraft.voicePreferenceNotes && this.tripDraft.voicePreferenceNotes.length > 0) {
-        const n = this.tripDraft.voicePreferenceNotes
-        lines.push(`Voice prefs: ${n.length > 220 ? `${n.substring(0, 217)}…` : n}`)
-      }
-      this.summaryText.text = lines.join('\n')
+      const from = this.tripDraft.departureCity.length > 0 ? this.tripDraft.departureCity : '—'
+      const to = this.tripDraft.destinationCity.length > 0 ? this.tripDraft.destinationCity : '—'
+      const depart = this.tripDraft.departureDateTime.length > 0 ? this.tripDraft.departureDateTime : '—'
+      const ret = this.tripDraft.arrivalDateTime.length > 0 ? this.tripDraft.arrivalDateTime : '—'
+      this.summaryText.text = `From ${from}\nTo ${to}\n${depart} – ${ret}`
     }
     this.onTripDraftUpdated.invoke(this.tripDraft)
   }
 
   private setStatus(message: string): void {
+    const shown = this.shortStatusForPanel(message)
     if (this.statusText) {
-      this.statusText.text = message
+      this.statusText.text = shown
     }
-    this.onPromptGenerated.invoke(message)
+    this.onPromptGenerated.invoke(shown)
+  }
+
+  /** Keep the New In City panel to a few lines. The full error stays in the Logger. */
+  private shortStatusForPanel(message: string): string {
+    if (!message) {
+      return ''
+    }
+    if (
+      message.indexOf('Gemini.models failed') >= 0 ||
+      message.indexOf('NOT_FOUND') >= 0 ||
+      message.indexOf('"code":404') >= 0 ||
+      message.indexOf('"code": 404') >= 0
+    ) {
+      return 'Could not reach Gemini.\nCheck Remote Service Gateway credentials\nand that this project can use the model.'
+    }
+    if (message.length > 220) {
+      return `${message.substring(0, 217)}…`
+    }
+    return message
   }
 
   private setGeneratingLoading(enabled: boolean): void {
@@ -1060,6 +1801,7 @@ export class GeminiAssistant extends BaseScriptComponent {
       `User display name: ${this.currentUserName}`,
       `Trip draft (fields may be empty strings): ${tripJson}`,
       'Use voicePreferenceNotes in the JSON for user intent (food, transport bias, family/work, hobbies) when generating options — never invent a different destination than destinationCity.',
+      'Field arrivalDateTime is the trip **return date** (end of stay), not the inbound flight arrival time of the outbound leg.',
       'Purpose must be exactly one of: leisure, business, bleisure.',
       `Include planning cards ONLY for these categories, in this order when possible: ${catList}.`,
       'If skipLongDistanceTransport is true, omit long-haul flights/trains; focus on local transit and day trips.',
@@ -1072,12 +1814,13 @@ export class GeminiAssistant extends BaseScriptComponent {
       '      "category": "<same as key>",',
       '      "options": [',
       '        {',
-      '          "provider": string, "title": string, "price"?: string, "departureTime"?: string, "arrivalTime"?: string, "notes"?: string,',
-      '          "sourceSite"?: string, "bookingProductUrl"?: string, "pricePerNight"?: string, "totalStayPrice"?: string,',
+      '          "provider": string, "title": string, "price"?: string (always like **"€8.80"** or **"from €20"** — never **"08.80"** or **"020"**), "departureTime"?: string, "arrivalTime"?: string, "notes"?: string,',
+      '          "sourceSite"?: string, "bookingProductUrl"?: string, "pricePerNight"?: string (e.g. **"€120-€180 typical range"**), "totalStayPrice"?: string (same € style),',
       '          "airline"?: string, "outboundSummary"?: string, "inboundSummary"?: string,',
       '          "ticketUrl"?: string, "ticketOfficeHint"?: string,',
       '          "pricePerPerson"?: string, "neighborhood"?: string, "dressCode"?: string,',
-      '          "weatherPracticalTips"?: string, "luggageVisionHint"?: string',
+      '          "weatherPracticalTips"?: string, "luggageVisionHint"?: string,',
+      '          "placeName"?: string, "mapHint"?: string',
       '        }',
       '      ]',
       '    }',
@@ -1088,14 +1831,17 @@ export class GeminiAssistant extends BaseScriptComponent {
       '  - Include a **mix of price tiers**: at least one **value or solid mid-range** hotel (well-reviewed, good neighborhood) and avoid listing only luxury 5-star properties unless purpose is business and voicePreferenceNotes clearly imply upscale stays.',
       '  - Include at least one **hotel price-comparison** option: set sourceSite to "Google Hotels", "Trivago", "Kayak Hotels", or "HotelsCombined", title like "Compare hotel rates in the destination city" using the draft dates, notes that users compare chains and OTAs for lower nightly rates.',
       '  - Spread other stays across realistic OTAs in sourceSite — e.g. booking.com, Agoda, Hotels.com, Expedia — not the same ultra-premium positioning for every row.',
-      '  - Use pricePerNight and totalStayPrice only as **broad indicative ranges** — when you include a number, **prefix a real currency symbol** (€, $, £, or JP¥) and avoid leading zeros (write "€400" not "0400"). Say "typical range" in words; never invent live rack rates. bookingProductUrl only when plausible public URLs; otherwise omit.',
+      '  - **All price strings (accommodation, transport, places, restaurants):** Put the **currency symbol before the number**. For euros use **€** unless the draft clearly implies USD/£. Examples: **"€8.80"**, **"€250/night"**, **"€300–€500"** or **"€300-€500"** for ranges, **"from €20"** for a floor. Never write naked decimals like **"08.80"**, never pad with leading zeros like **"020"** or **"0100"**, never bare ranges without €.',
+      '  - Use pricePerNight and totalStayPrice only as **broad indicative ranges** — say "typical range" in words when helpful; never invent live rack rates. bookingProductUrl only when plausible public URLs; otherwise omit.',
       'For transportation when departureCity differs from destinationCity AND skipLongDistanceTransport is false (long-haul / international):',
       '  - Include at least one option aimed at **price comparison**: set sourceSite to "Skyscanner" or "Google Flights" or "Kayak", title like "Compare Rome → Tokyo flights" using the draft dates, notes explaining user compares airlines and times there — do not invent obscure airline brands (e.g. avoid fake names like "National Airways") as the only booking path.',
       '  - When both departure and return dates exist in the draft, at least one transportation option must frame **round-trip / return-included** search in title or notes and state that **round-trip tickets are usually much cheaper than buying two separate one-way tickets**; do not present two one-ways as the default cheapest path.',
-      '  - Add 1–2 additional options naming **real** major carriers that commonly serve similar routes (e.g. ITA Airways, JAL, ANA, Lufthansa, Air France) as examples in title/notes/airline; price may be qualitative with a **currency symbol** (e.g. "from €800 typical round-trip range") or omitted — never fake live fares or use naked numbers with leading zeros.',
+      '  - Add 1–2 additional options naming **real** major carriers that commonly serve similar routes (e.g. ITA Airways, JAL, ANA, Lufthansa, Air France) as examples in title/notes/airline; **price** must follow the same €-prefix rules (e.g. **"from €20"**, **"€8.80"** for a day ticket) — never **"from 020"**, **"08.80"**, or leading-zero-only amounts.',
       '  - Prefer ticketUrl only for well-known public flight-search URLs; if unsure, omit ticketUrl and keep sourceSite + notes.',
       'For transportation when cities match, skipLongDistanceTransport is true, or dates missing: local transit / trains / day trips only.',
       'If voicePreferenceNotes mention shortest/cheapest/direct, reflect that in transportation titles and notes.',
+      'Map pins: for accommodation, places, and restaurants always set placeName to the venue or neighborhood a traveler would search, and mapHint to one short line (walk, metro, or taxi from city center or the suggested hotel). Do not write turn-by-turn directions.',
+      'For transportation set placeName only when the option is a real station, airport, or stop (example: "LIS airport"). Omit placeName on generic compare-flights rows.',
       'For places: ticketUrl and/or ticketOfficeHint for ticket purchase.',
       'For restaurants: include at least 3 options when possible: (1) one Michelin-star or clear fine-dining pick, (2) one famous street-food / market stall locals love, note strong TripAdvisor (or similar) reputation, (3) one other authentic local favorite. Put labels like "Michelin-style", "Street food", "Local classic" in title or notes.',
       'For weather: weatherPracticalTips (what to wear / rain / UV) — not raw API codes.',
@@ -1138,6 +1884,17 @@ export class GeminiAssistant extends BaseScriptComponent {
         return null
       }
       this.tripLog(`parseTripPlanJson OK: keys=${Object.keys(parsed.cards).join(',')}`)
+      normalizeTripPlanPriceFields(parsed)
+      const acc = parsed.cards.accommodation
+      if (acc && acc.options && acc.options.length > 0) {
+        const o0 = acc.options[0]
+        const keys = Object.keys(o0 as object).join(',')
+        const ppn = o0.pricePerNight
+        const tsp = o0.totalStayPrice
+        print(
+          `[GeminiAssistant] after normalize (PlanPriceFormat r${PLAN_PRICE_FORMAT_REVISION}) acc[0] keys=[${keys}] pricePerNight=${ppn === undefined || ppn === null ? String(ppn) : JSON.stringify(ppn)} totalStayPrice=${tsp === undefined || tsp === null ? String(tsp) : JSON.stringify(tsp)} typeof(ppn)=${typeof ppn}`,
+        )
+      }
       return parsed
     } catch (e) {
       this.log.e(`parseTripPlanJson: JSON.parse failed: ${e}`)
@@ -1231,10 +1988,10 @@ export class GeminiAssistant extends BaseScriptComponent {
       return 'Please tell me your destination city (or say: I am already there).'
     }
     if (this.tripDraft.departureDateTime.length === 0) {
-      return 'Please tell me departure date and time.'
+      return 'Please tell me your departure date (for example: leaving on 17 May).'
     }
     if (this.tripDraft.arrivalDateTime.length === 0) {
-      return 'Please tell me arrival date and time.'
+      return 'Please tell me your return date (for example: returning on 22 May).'
     }
     return 'Trip data ready.'
   }
@@ -1309,14 +2066,19 @@ export class GeminiAssistant extends BaseScriptComponent {
 
     if (kw === 'to') {
       const trip = t.match(
-        /\bfrom\s+[a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2}\s+to\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+from\s|\s+on\b|[,.]|\s+for\s|\s+the\s|$)/,
+        /\bfrom\s+[a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2}\s+to\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+from\s|\s+on\b|[,.]|\s+for\s|\s+the\s|\s+my\s|\s+and\s|$)/,
       )
       if (trip && trip[1]) {
         return this.sanitizeCityCandidate(trip[1].trim()) || ''
       }
-      const loose = t.match(/\bto\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+from|\s+on|[,.]|$)/)
+      const loose = t.match(
+        /\bto\s+([a-z][a-z'\-]*(?:\s+[a-z][a-z'\-]*){0,2})(?=\s+from|\s+on\b|\s+for\b|\s+my\b|\s+the\b|\s+and\b|\s+in\b|[,.]|$)/,
+      )
       if (loose && loose[1]) {
-        return this.sanitizeCityCandidate(loose[1].trim()) || ''
+        const candidate = loose[1].trim()
+        if (!this.looksLikeInfinitiveAfterTo(candidate)) {
+          return this.sanitizeCityCandidate(candidate) || ''
+        }
       }
       return ''
     }
@@ -1330,7 +2092,7 @@ export class GeminiAssistant extends BaseScriptComponent {
     return this.sanitizeCityCandidate(match[1].trim()) || ''
   }
 
-  /** Drops month/weekday tokens so "Berlin May" → "Berlin"; rejects pure "May" as a city. */
+  /** Drops month/weekday tokens so "Berlin May" → "Berlin"; rejects UI verbs and non-place speech. */
   private sanitizeCityCandidate(raw: string): string | null {
     const stripped = raw
       .trim()
@@ -1344,7 +2106,66 @@ export class GeminiAssistant extends BaseScriptComponent {
     if (words.length === 0) {
       return null
     }
+    if (!this.isPlausiblePlacePhrase(words)) {
+      if (this.verboseTripLogs) {
+        this.tripLog(`Rejected non-place city candidate: "${raw.trim()}"`)
+      }
+      return null
+    }
     return this.toCityCase(words.join(' '))
+  }
+
+  /** True when `to <word>` is almost certainly a verb phrase ("to continue"), not a destination. */
+  private looksLikeInfinitiveAfterTo(candidate: string): boolean {
+    const first = candidate.split(/\s+/)[0]?.toLowerCase() || ''
+    return first.length > 0 && GeminiAssistant.NON_PLACE_WORDS.has(first)
+  }
+
+  private isBlockedPlaceWord(token: string): boolean {
+    const t = token.toLowerCase().replace(/[^a-z'\-]/g, '')
+    if (!t.length) {
+      return true
+    }
+    return GeminiAssistant.NON_PLACE_WORDS.has(t)
+  }
+
+  private isPlausiblePlacePhrase(words: string[]): boolean {
+    if (words.length === 0 || words.length > 3) {
+      return false
+    }
+    for (let i = 0; i < words.length; i++) {
+      if (!this.isPlausiblePlaceToken(words[i])) {
+        return false
+      }
+    }
+    if (words.length === 1 && GeminiAssistant.WEAK_SINGLE_PLACE_WORDS.has(words[0].toLowerCase())) {
+      return false
+    }
+    const genericGeo = new Set<string>(['city', 'town', 'country', 'state', 'region', 'area', 'place', 'airport', 'hotel'])
+    if (words.every((w) => genericGeo.has(w.toLowerCase()))) {
+      return false
+    }
+    return true
+  }
+
+  private isPlausiblePlaceToken(token: string): boolean {
+    const t = token.toLowerCase().replace(/[^a-z'\-]/g, '')
+    if (t.length === 0) {
+      return false
+    }
+    if (GeminiAssistant.NON_CITY_TOKENS.has(t) || this.isBlockedPlaceWord(t)) {
+      return false
+    }
+    if (GeminiAssistant.PLACE_SHORT_CODES.has(t)) {
+      return true
+    }
+    if (t.length < 2) {
+      return false
+    }
+    if (/^\d+$/.test(t)) {
+      return false
+    }
+    return true
   }
 
   private appendTripPreferenceHintsFromSpeech(transcript: string): void {
@@ -1650,25 +2471,6 @@ export class GeminiAssistant extends BaseScriptComponent {
         widget.enabled = false
       }
     }
-  }
-
-  private isYes(text: string): boolean {
-    const t = text.toLowerCase().trim()
-    if (t === 'yes' || t.indexOf('yes,') === 0 || t.indexOf('yes ') === 0) {
-      return true
-    }
-    return /\b(sure|correct|yeah|yep|yup|absolutely|definitely|ok|okay)\b/.test(t)
-  }
-
-  private isNo(text: string): boolean {
-    const t = text.toLowerCase().trim()
-    if (t === 'no' || t.indexOf('no,') === 0 || t.indexOf('no ') === 0) {
-      return true
-    }
-    if (/\b(another city|different city|not from here|wrong city)\b/.test(t)) {
-      return true
-    }
-    return /\bno\b/.test(t) && t.length < 36
   }
 
   private isLocalExploreIntent(text: string): boolean {

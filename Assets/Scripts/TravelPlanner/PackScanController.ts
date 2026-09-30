@@ -5,6 +5,7 @@ import { GoogleGenAITypes } from 'RemoteServiceGateway.lspkg/HostedExternal/Goog
 import { VideoController } from 'RemoteServiceGateway.lspkg/Helpers/VideoController'
 import { GeminiAssistant } from './GeminiAssistant'
 import { CategoryPlanDetailController } from './CategoryPlanDetailController'
+import { TripPlanningCategory } from './TripTypes'
 import { WeatherAccuBridge } from './WeatherAccuBridge'
 
 type PackScanState = 'idle' | 'open' | 'sending'
@@ -21,6 +22,11 @@ type PackScanState = 'idle' | 'open' | 'sending'
  * `CategoryPlanDetailController.detailBodyText`, and **`packScanDetailText`** on the category controller
  * to **`packScanResultText`**. Opening **Scan Pack** clears the category line; opening **any category row**
  * clears the scan line — no overlapping parents, only empty-string swaps.
+ *
+ * **Category navigation:** when `categoryPlanDetailController` is assigned, opening **any non-pack**
+ * category row ends an active Pack scan session and hides **`scanSectionHeadFollowRoot`** so the scan holder
+ * does not stay visible over Accommodation / Transport detail. After a **finished** scan, the holder
+ * stays enabled until **Close** or a new scan so analyzed result text remains visible (see `packScanAwaitingDismiss`).
  */
 @component
 export class PackScanController extends BaseScriptComponent {
@@ -48,6 +54,13 @@ export class PackScanController extends BaseScriptComponent {
   @allowUndefined
   @hint('Pack HUD root. Scan is gated to only run when this HUD is enabled.')
   packScanHud: SceneObject
+
+  @input
+  @allowUndefined
+  @hint(
+    'Optional **session holder** (e.g. Container root for scan UI + **DeviceTracking**). The whole object is **enabled** while a scan session is **open** or **sending**, and **disabled** when the session ends (e.g. **Close**) or if `packScanHud` is off. If `packScanHud` is a child, it is enabled before the "Scan Pack ignored" check.',
+  )
+  scanSectionHeadFollowRoot: SceneObject
 
   @input
   @allowUndefined
@@ -95,7 +108,7 @@ export class PackScanController extends BaseScriptComponent {
 
   @input
   @hint('Gemini model for pack-check generation. gemini-2.0-flash supports inlineData images.')
-  geminiModel: string = 'gemini-2.0-flash'
+  geminiModel: string = 'gemini-2.5-flash-lite'
 
   @input
   @hint('Capture interval (ms) hint for the VideoController used during a one-shot snapshot.')
@@ -128,6 +141,12 @@ export class PackScanController extends BaseScriptComponent {
   private packDetailPostIdleFramesRemaining: number = 0
   private pendingPackDetailBody: string | null = null
   private packDetailFlushToken: number = 0
+  /**
+   * After Gemini returns, state becomes `idle` but the analyzed copy must stay visible under
+   * `scanSectionHeadFollowRoot`. If we disabled the holder immediately (old bug), the result `Text`
+   * vanished with the camera shell. Cleared on Close, new scan, or category navigation.
+   */
+  private packScanAwaitingDismiss: boolean = false
 
   private setPackScanState(next: PackScanState): void {
     const prev = this.state
@@ -139,12 +158,15 @@ export class PackScanController extends BaseScriptComponent {
       this.geminiAssistant.notifyPackScanDetailUiLockEntered()
     }
     this.state = next
+    this.updateScanSectionHeadFollowForState()
   }
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
       this.bindUi()
+      this.bindCategoryNavigationBridge()
       this.applyIdleVisibility()
+      this.updateScanSectionHeadFollowForState()
       this.createEvent('UpdateEvent').bind(() => this.onUpdatePackDetailFlush())
       this.tripLog('PackScanController ready. Pinch Scan Pack to open session; live camera preview follows `showLiveCameraPreview`.')
     })
@@ -165,8 +187,23 @@ export class PackScanController extends BaseScriptComponent {
   }
 
   private onScanPack(): void {
+    this.packScanAwaitingDismiss = false
+    if (this.scanSectionHeadFollowRoot) {
+      try {
+        this.scanSectionHeadFollowRoot.enabled = true
+      } catch (_) {
+        /* ignore */
+      }
+    }
     if (!this.packScanHud || !this.packScanHud.enabled) {
       this.tripLog('Scan Pack ignored: packScanHud is not enabled.')
+      if (this.scanSectionHeadFollowRoot) {
+        try {
+          this.scanSectionHeadFollowRoot.enabled = false
+        } catch (_) {
+          /* ignore */
+        }
+      }
       return
     }
     if (this.state === 'sending') {
@@ -204,7 +241,23 @@ export class PackScanController extends BaseScriptComponent {
   }
 
   private onClose(): void {
+    this.packScanAwaitingDismiss = false
     const restoreCategoryPanel = this.state === 'open' || this.state === 'sending'
+    this.tearDownActiveScanSessionCore()
+    this.setPackScanState('idle')
+    this.applyIdleVisibility()
+    if (restoreCategoryPanel && this.categoryPlanDetailController) {
+      this.categoryPlanDetailController.reapplyLastCategoryDetail()
+      // `reapplyLastCategoryDetail` → `openCategoryDetail('pack')` calls `setPackHudRootsEnabled(true)`,
+      // which re-enables `packScanFullHudRoot` when the Pack row is still selected — same object as
+      // `scanSectionHeadFollowRoot`. Re-assert session-holder visibility after category wiring.
+      this.updateScanSectionHeadFollowForState()
+    }
+    this.tripLog('Scan session closed.')
+  }
+
+  /** Stops capture + timers; caller sets `packScanState` / UI. */
+  private tearDownActiveScanSessionCore(): void {
     this.previewEnableToken++
     this.packDetailFlushToken++
     this.pendingPackDetailBody = null
@@ -213,16 +266,36 @@ export class PackScanController extends BaseScriptComponent {
       try {
         this.pendingCapture.stopRecording()
       } catch (e) {
-        this.log.e(`pendingCapture.stopRecording: ${e}`)
+        this.log.e(`tearDownActiveScanSessionCore: ${e}`)
       }
       this.pendingCapture = null
     }
+  }
+
+  /**
+   * When user opens Transport / Accommodation / … while a scan session is open — no Close pinch.
+   * Does not restore category text (the new row’s body is applied next).
+   */
+  private endScanSessionForCategoryNavigation(): void {
+    if (this.state !== 'open' && this.state !== 'sending') {
+      return
+    }
+    this.packScanAwaitingDismiss = false
+    this.tearDownActiveScanSessionCore()
     this.setPackScanState('idle')
     this.applyIdleVisibility()
-    if (restoreCategoryPanel && this.categoryPlanDetailController) {
-      this.categoryPlanDetailController.reapplyLastCategoryDetail()
+    this.tripLog('Scan session ended (opened another category).')
+  }
+
+  private bindCategoryNavigationBridge(): void {
+    if (!this.categoryPlanDetailController) {
+      return
     }
-    this.tripLog('Scan session closed.')
+    this.categoryPlanDetailController.onBeforeCategoryDetailChange.add((cat: TripPlanningCategory) => {
+      if (cat !== 'pack') {
+        this.endScanSessionForCategoryNavigation()
+      }
+    })
   }
 
   private applyIdleVisibility(): void {
@@ -231,6 +304,40 @@ export class PackScanController extends BaseScriptComponent {
     this.setButtonVisible(this.captureButton, false)
     this.setButtonVisible(this.closeButton, false)
     this.setButtonVisible(this.scanButton, true)
+  }
+
+  /**
+   * Session holder: on while **open/sending**, or while **idle** with a finished scan still on screen
+   * (`packScanAwaitingDismiss`) so analyzed text is not parented under a disabled root.
+   * DeviceTracking follows the user only during **open/sending** — idle result stays put until Close.
+   */
+  private updateScanSectionHeadFollowForState(): void {
+    if (!this.scanSectionHeadFollowRoot) {
+      return
+    }
+    const hudOk = !!(this.packScanHud && this.packScanHud.enabled)
+    const sessionActive = this.state === 'open' || this.state === 'sending'
+    const keepShellForScanResult = this.state === 'idle' && this.packScanAwaitingDismiss
+    const rootOn = hudOk && (sessionActive || keepShellForScanResult)
+    const trackingOn = hudOk && sessionActive
+    try {
+      if (rootOn) {
+        this.scanSectionHeadFollowRoot.enabled = true
+      }
+      const dt = this.scanSectionHeadFollowRoot.getComponent('DeviceTracking') as any
+      if (dt && typeof dt.enabled === 'boolean') {
+        dt.enabled = trackingOn
+      } else if (this.verboseLogs && rootOn && trackingOn) {
+        this.tripLog(
+          'Head-follow: add **DeviceTracking** to scanSectionHeadFollowRoot for camera/buttons to follow the user.',
+        )
+      }
+      if (!rootOn) {
+        this.scanSectionHeadFollowRoot.enabled = false
+      }
+    } catch (e) {
+      this.log.e(`updateScanSectionHeadFollowForState: ${e}`)
+    }
   }
 
   private applyOpenVisibility(): void {
@@ -426,7 +533,7 @@ export class PackScanController extends BaseScriptComponent {
       this.finishSendingOnMainThread('No scan response. Try again.')
       return
     }
-    const compact = text.trim()
+    const compact = this.trimPackScanResultForDisplay(text.trim(), 2600)
     this.finishSendingOnMainThread(`— Pack —\n\n${compact}`)
   }
 
@@ -468,6 +575,7 @@ export class PackScanController extends BaseScriptComponent {
       return
     }
     this.setPackDetailBody(body)
+    this.packScanAwaitingDismiss = body.trim().length > 0
     this.setPackScanState('idle')
   }
 
@@ -488,6 +596,22 @@ export class PackScanController extends BaseScriptComponent {
     return s
   }
 
+  /** Keeps pack scan copy readable on-lens if the model runs long — cut on a line boundary when possible. */
+  private trimPackScanResultForDisplay(raw: string, maxChars: number): string {
+    const t = raw.trim()
+    if (t.length <= maxChars) {
+      return t
+    }
+    let s = t.substring(0, maxChars)
+    const lastBreak = s.lastIndexOf('\n')
+    if (lastBreak > maxChars * 0.5) {
+      s = s.substring(0, lastBreak).trimEnd()
+    } else {
+      s = s.trimEnd()
+    }
+    return `${s}\n\n…(shortened)`
+  }
+
   private buildPackPrompt(): string {
     const observed = this.observedItemsText ? this.observedItemsText.text.trim() : ''
     const draft = this.geminiAssistant ? this.geminiAssistant.resolveTripSurfaceForPackScan() : null
@@ -497,9 +621,9 @@ export class PackScanController extends BaseScriptComponent {
           `Departure city: ${draft.departureCity || '-'}`,
           `Destination: ${draft.destinationCity || '-'}`,
           `Depart date: ${draft.departureDateTime || '-'}`,
-          `Arrive date: ${draft.arrivalDateTime || '-'}`,
+          `Return date: ${draft.arrivalDateTime || '-'}`,
           `Purpose: ${draft.purpose}`,
-          '(Cities use User Context when available, otherwise the assistant fallback city such as Berlin.)',
+          '(Cities come from your trip draft or device User Context when you use "current location".)',
           draft.voicePreferenceNotes && draft.voicePreferenceNotes.trim().length > 0
             ? `User notes: ${draft.voicePreferenceNotes.trim()}`
             : '',
@@ -517,24 +641,43 @@ export class PackScanController extends BaseScriptComponent {
     const weatherStrip = this.buildAccuWeatherSnippet()
 
     return [
-      'You are a practical packing assistant. The user may send a photo of packed items (luggage, flat lay, or shelf).',
+      'You are a practical luggage checker for a traveler wearing AR glasses.',
+      'The user should aim the camera so the FRONT FACE of one bag fills most of the frame. Judge that face only. Do not invent items behind the bag or outside the frame.',
+      'If the bag does not fill the frame, say so first and do not guess a size.',
       'Trip context:',
       tripContext,
       observedLine,
       planSnippet.length > 0 ? `Itinerary / plan hints:\n${planSnippet}` : '',
       weatherStrip.length > 0 ? `Weather context:\n${weatherStrip}` : '',
+      this.packingScheduleLine(),
       'Describe only what is clearly visible in the image for the first section. Do not invent objects in the photo.',
-      'Use neutral section headings (exactly these three, in order, each followed by your bullets):',
-      'Visible items',
-      'Gaps or risks for this trip',
+      'Use these section headings exactly, in this order:',
+      'Bag face',
+      'Size class',
+      'Fee risk',
+      'Airline note',
       'Suggested additions',
-      'Under "Visible items": list concrete objects you actually see, or a single line like "No packed travel gear visible" if the frame is a room / not luggage.',
-      'Under "Gaps or risks": relate missing gear to the trip context (dates, purpose, destination).',
-      'Under "Suggested additions": ALWAYS give 3–6 specific packing ideas (clothing, toiletries, adapters, documents, gear) grounded in destination, trip purpose, dates/season, and any weather context above — even when nothing travel-related is visible in the photo. Never reply with only "N/A", "none", or an empty section here.',
-      'Keep each section to short bullets; total under 18 lines.',
+      'Bag face: one or two lines about what is actually on the luggage face (hard shell, soft, wheels, straps, overstuffed). If this is not luggage, say "No bag face in frame" and skip size guesses.',
+      'Size class: exactly one of Personal item, Cabin, Checked, or Oversized. Add a rough comparison to a typical cabin bag (about 55×40×20 cm) only if proportions are visible. If scale is unclear, write "Size unclear — hold a hand or boarding pass beside the bag."',
+      'Fee risk: if Checked or Oversized, warn that many airlines charge for a second or overweight bag (often above 23 kg) and that the traveler should check the fare’s baggage before buying. If it looks like a bulky Cabin bag, warn it may be gate-checked. If Personal item or a clearly small Cabin bag, say fee risk looks low but is not a guarantee.',
+      'Airline note: from the route in trip context, name one or two real carriers that commonly fly it and whether they are usually tighter or more generous on cabin size or an included checked bag. Do not invent ticket prices. End with: compare baggage on the fare, not just the ticket price.',
+      'Suggested additions: 3 short bullets grounded in the trip weather schedule (departure city, destination stay, and the return day at home), the trip purpose, and whether they are flying. A summer flight still needs a cabin layer. Never reply with only "N/A".',
+      'Keep each section to one or two short lines. Whole reply at most 14 lines.',
     ]
       .filter((s) => s.length > 0)
       .join('\n')
+  }
+
+  private packingScheduleLine(): string {
+    if (!this.weatherAccuBridge || !this.geminiAssistant) {
+      return ''
+    }
+    try {
+      const brief = this.weatherAccuBridge.getPackingContext(this.geminiAssistant.getTripDraft())
+      return brief.length > 0 ? `Trip weather and pack brief:\n${brief}` : ''
+    } catch (e) {
+      return ''
+    }
   }
 
   private buildLastPlanPackWeatherSnippet(): string {
@@ -702,7 +845,7 @@ export class PackScanController extends BaseScriptComponent {
 
   /** Pack scan status + results: `packScanResultText` if set, else `detailBodyText` only. */
   private setPackDetailBody(message: string): void {
-    const maxLen = this.isRunningInLensEditor() ? 6000 : 12000
+    const maxLen = this.isRunningInLensEditor() ? 4500 : 9000
     let safe = this.sanitizePackDisplayString(message)
     if (safe.length > maxLen) {
       safe = `${safe.substring(0, maxLen)}\n\n…(truncated for display)`

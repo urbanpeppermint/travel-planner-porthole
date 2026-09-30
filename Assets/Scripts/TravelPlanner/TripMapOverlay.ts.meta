@@ -1,0 +1,53 @@
+- !<AssetImportMetadata/956b4371-725e-4c04-89c6-25f1ea1423df>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 74c8125f-5558-4d15-81a2-64fc3a593d31
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 74c8125f-5558-4d15-81a2-64fc3a593d31
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 7e256795-2305-476f-a03e-c18b54007ead
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/7e256795-2305-476f-a03e-c18b54007ead>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: bca89f3f-bbf0-4623-9468-d76ae59ad38d
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    floatingMapRoot: false
+    floatingMapText: false
+    geminiAssistant: false
+    maxPins: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      floatingMapRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      floatingMapText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      maxPins: !<float> 6.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input AssignableType geminiAssistant {"hint":"Plan source. Overlay fills when onTripPlanReady fires."}'
+    - '// @input SceneObject floatingMapRoot {"hint":"Optional panel root. Enabled when pins exist; hidden again if the next plan has none."}'
+    - '// @input Component.Text floatingMapText {"hint":"Short multi-line Text for the pin list."}'
+    - '// @input float maxPins = 6 {"hint":"How many pins to show. Keep this small so the panel stays glanceable."}'

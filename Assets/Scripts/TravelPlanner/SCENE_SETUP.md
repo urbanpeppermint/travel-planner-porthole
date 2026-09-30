@@ -1,12 +1,54 @@
+## Live UI (TripOptic glass prototype)
+
+The Spectacles 2024 look now matches the 5.24 mockup. Runtime glass lives on **`TripOptic_Proto`** (`TripOpticLayoutPrototype` at world `(0, 0, -60)`). Old category columns, the New In City prompt, and `DestinationViewSystem` are hidden. Voice, Gemini, weather, and pack-scan scripts still run on `Assistant_System`.
+
+| Open in 5.15 | Notes |
+|---|---|
+| `TripOptic_Proto` | Capsules, portal, Ask bar, weather chip, tip card |
+| `Spatial Image` | Child of `TripOptic_Proto` at local `(0, 4.9, -10)` |
+| Materials | `TripOptic_Glass`, `TripOptic_Icon`, `TripOptic_Photo` |
+| Icons | `Assets/Icons/` (bed, train, restaurant, …) |
+| Ask bar | Pinch toggles `ASRQueryController` and starts `GeminiAssistant` |
+| Places photos | Paste a Google Places API (New) key on `TripOptic_Proto` — never commit it |
+| Old panels | `AIAssistantUIBridge.useTripOpticPrototype` is **on**. Turn it **off** to restore the previous UI |
+
+If `TripOptic_Photo` fails to open, rebuild it from `TRIPOPTIC_5.15_PORT.md` §6.3. Do not open this project in Lens Studio 5.24.
+
 ## Travel Planner Scene Setup (current)
 
-Scripts live in `Assets/Scripts/TravelPlanner/`.
+Scripts live in `Assets/Scripts/TravelPlanner/` (planner) and `Assets/Scripts/TripOptic/` (glass UI).
 
 ### Core flow
 - `GeminiAssistant` captures draft (voice or keyboard), requests plan, updates category rows.
 - `AIAssistantUIBridge` wires buttons and keyboard step flow.
-- `CategoryPlanDetailController` opens beta details when category rows are pinched.
-- `PackScanController` runs Pack HUD scan checks via Gemini when Pack is open.
+- `CategoryPlanDetailController` opens a **compact dropdown** when a category row is pinched (menu first, then one option at a time). A **⌖** mark sits on hotels, places, restaurants, and stations.
+- `TripMapOverlay` writes a short floating pin list when a plan is ready.
+- `PackScanController` runs Pack HUD scan checks via Gemini when Pack is open. Capture should fill the frame with the **bag face**; the reply includes size class, fee risk, and an airline baggage note.
+
+### Calm category UI
+
+Rows stay one line (`Transportation (3) ▾`). The detail card stays empty until a pinch.
+
+1. First pinch → short menu (up to 4 lines: title, price, ⌖ when it is a place).
+2. Next pinches → only that option, then the next. After the last option the card closes.
+3. Weather and Pack close on the second pinch. Pack still opens the scan HUD.
+
+### Floating map
+
+Add `TripMapOverlay` on `Assistant_System` (or a small panel beside the rows):
+
+| Input | Wire to |
+|---|---|
+| `geminiAssistant` | `GeminiAssistant` |
+| `floatingMapRoot` | optional small panel; hidden until a plan has pins |
+| `floatingMapText` | short `Text` on that panel |
+| `maxPins` | default 6 |
+
+Pins come from Gemini `placeName` / `mapHint` on stays, places, restaurants, and transport stops. This list is a glanceable index, not live navigation.
+
+### Pack scan (bag face)
+
+Aim so the **front of one bag** fills the preview, then Capture. The result uses five headings: Bag face, Size class (personal / cabin / checked / oversized), Fee risk, Airline note, Suggested additions. Size is a visual estimate; fee copy tells the traveler to compare baggage on the fare.
 - `WeatherAccuBridge` fetches real weather from `Accuweather.remoteServiceModule`.
 
 ### Purpose labels
@@ -32,17 +74,18 @@ Only these three purpose labels are supported now:
 
 ### Optional assistant TTS (keyboard + voice guidance)
 
-Add **`AssistantTtsController`** on the same hierarchy as `GeminiAssistant` / `AIAssistantUIBridge`:
+Add **`AssistantTtsController`** on the same hierarchy as `GeminiAssistant` / `AIAssistantUIBridge` (bundled scene: **`Assistant_System`** next to `CategoryPlanDetailController`):
 
 | Input | Purpose |
 |---|---|
-| `geminiAssistant` | Speaks status / missing-field lines from `onPromptGenerated` when **`speakVoiceGuidance`** is on. |
+| `geminiAssistant` | Speaks status / missing-field lines from `onPromptGenerated` when **`speakVoiceGuidance`** is on (welcome, departure question, next-field prompts). |
 | `uiBridge` | Speaks keyboard step prompts via **`onKeyboardGuidance`** when **`speakKeyboardGuidance`** is on. |
-| `audioOutputRoot` | Optional object with (or without) **AudioComponent**; TTS MP3 plays here. |
+| `categoryPlanDetailController` | Speaks the **same** multi-line body as the category info card when a **category title** row is pinched (`onCategoryDetailBody`), when **`speakCategoryDetail`** is on. Uses a higher **`maxCategoryDetailSpeakChars`** cap than status lines. |
+| `audioOutputRoot` | Optional object with (or without) **AudioComponent**; TTS MP3 plays here (defaults to `Assistant_System`). |
 
 **Credentials:** set an **OpenAI** API token on **`RemoteServiceGatewayCredentials`** (same slot as other RSG OpenAI examples). Without it, TTS calls fail silently in logs; on-screen text is unchanged.
 
-**Toggles:** `enableTts`, `speakKeyboardGuidance`, and `speakVoiceGuidance` can be adjusted per build. Editor-only lines such as “AR keyboard: build to Spectacles” are skipped for keyboard TTS.
+**Toggles:** `enableTts`, `speakKeyboardGuidance`, `speakVoiceGuidance`, and **`speakCategoryDetail`** can be adjusted per build. **`maxSpeakChars`** / **`maxCategoryDetailSpeakChars`** truncate before the OpenAI speech call (defaults allow long welcome + long category cards). Editor-only lines such as “AR keyboard: build to Spectacles” are skipped for keyboard TTS.
 
 ### AR keyboard for typed trip fields (Spectacles pattern)
 

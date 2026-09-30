@@ -1,0 +1,110 @@
+- !<AssetImportMetadata/e5cb5c91-0bcf-4620-b1b9-a34e6513b8cd>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 2526362e-7923-4b92-9445-e3e5b79a701e
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 2526362e-7923-4b92-9445-e3e5b79a701e
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 97b71fc1-6091-44d8-8e5d-d0f39a0dc1ca
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/97b71fc1-6091-44d8-8e5d-d0f39a0dc1ca>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 044cb0a0-b743-47e9-a5e4-41f5985b7a5a
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    asrQueryController: false
+    city: false
+    days: false
+    geminiAssistant: false
+    glassMaterial: false
+    iconClose: false
+    iconFood: false
+    iconMaterial: false
+    iconMic: false
+    iconPack: false
+    iconPhoto: false
+    iconPlaces: false
+    iconStar: false
+    iconStay: false
+    iconTip: false
+    iconTransport: false
+    iconWeather: false
+    internetModule: false
+    photoMaterial: false
+    placesApiKey: false
+    purpose: false
+    remoteMediaModule: false
+    titleFont: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - city: Paris
+      purpose: Leisure
+      days: !<float> 3.000000
+      glassMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      iconMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      photoMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      titleFont: !<reference.Font> 00000000-0000-0000-0000-000000000000
+      internetModule: !<reference.InternetModule> 00000000-0000-0000-0000-000000000000
+      remoteMediaModule: !<reference.RemoteMediaModule> 00000000-0000-0000-0000-000000000000
+      placesApiKey: ""
+      geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      asrQueryController: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      iconStay: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconTransport: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconFood: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconPlaces: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconWeather: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconPack: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconMic: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconTip: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconClose: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconStar: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      iconPhoto: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input string city = "Paris"'
+    - '// @input string purpose = "Leisure"'
+    - // @input float days = 3
+    - // @input Asset.Material glassMaterial
+    - // @input Asset.Material iconMaterial
+    - // @input Asset.Material photoMaterial
+    - // @input Asset.Font titleFont
+    - // @input Asset.InternetModule internetModule
+    - // @input Asset.RemoteMediaModule remoteMediaModule
+    - '// @input string placesApiKey {"hint":"Google Places API (New) key. Keep it in the scene only; never commit it."}'
+    - '// @input AssignableType geminiAssistant {"hint":"Existing 5.15 Gemini assistant. Ask bar starts the same trip session."}'
+    - '// @input AssignableType_1 asrQueryController {"hint":"Existing 5.15 speech capture. Ask bar pinch toggles listen/stop."}'
+    - // @input Asset.Texture iconStay
+    - // @input Asset.Texture iconTransport
+    - // @input Asset.Texture iconFood
+    - // @input Asset.Texture iconPlaces
+    - // @input Asset.Texture iconWeather
+    - // @input Asset.Texture iconPack
+    - // @input Asset.Texture iconMic
+    - // @input Asset.Texture iconTip
+    - // @input Asset.Texture iconClose
+    - // @input Asset.Texture iconStar
+    - // @input Asset.Texture iconPhoto

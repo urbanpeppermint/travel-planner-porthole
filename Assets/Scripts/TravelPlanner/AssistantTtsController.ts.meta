@@ -27,10 +27,13 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     audioOutputRoot: false
+    categoryPlanDetailController: false
     debounceSec: false
     enableTts: false
     geminiAssistant: false
+    maxCategoryDetailSpeakChars: false
     maxSpeakChars: false
+    speakCategoryDetail: false
     speakKeyboardGuidance: false
     speakVoiceGuidance: false
     ttsModel: false
@@ -48,14 +51,17 @@
   DefaultScriptInputs:
     - geminiAssistant: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       uiBridge: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      categoryPlanDetailController: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
       audioOutputRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       enableTts: true
       speakKeyboardGuidance: true
       speakVoiceGuidance: true
+      speakCategoryDetail: true
       ttsModel: tts-1
       ttsVoice: nova
       debounceSec: 0.450000
-      maxSpeakChars: !<float> 420.000000
+      maxSpeakChars: !<float> 900.000000
+      maxCategoryDetailSpeakChars: !<float> 2400.000000
       verboseLogs: true
   ScriptTypes:
     -
@@ -63,12 +69,15 @@
   InputLines:
     - '// @input AssignableType geminiAssistant {"hint":"Trip assistant whose status / missing-field prompts are spoken in voice mode."}'
     - '// @input AssignableType_1 uiBridge {"hint":"UI bridge whose keyboard prompts are spoken while keyboard flow is active."}'
+    - '// @input AssignableType_2 categoryPlanDetailController {"hint":"When assigned, speaks category info-card copy after each category title pinch."}'
     - '// @input SceneObject audioOutputRoot {"hint":"SceneObject that plays TTS (gets or creates AudioComponent). Defaults to this object."}'
     - '// @input bool enableTts = true {"hint":"Master switch for all TTS."}'
     - '// @input bool speakKeyboardGuidance = true {"hint":"Speak keyboard step prompts from the bridge."}'
     - '// @input bool speakVoiceGuidance = true {"hint":"Speak GeminiAssistant status / guidance lines (missing fields, welcome, etc.)."}'
+    - '// @input bool speakCategoryDetail = true {"hint":"Speak multi-line category detail when user opens a category row (info card)."}'
     - '// @input string ttsModel = "tts-1" {"hint":"OpenAI speech model (e.g. tts-1, tts-1-hd, gpt-4o-mini-tts)."}'
     - '// @input string ttsVoice = "nova" {"hint":"OpenAI TTS voice (e.g. nova, alloy, shimmer)."}'
     - '// @input float debounceSec = 0.45 {"hint":"Debounce rapid text updates before calling the API (seconds)."}'
-    - '// @input float maxSpeakChars = 420 {"hint":"Max characters sent to TTS (rest truncated)."}'
+    - '// @input float maxSpeakChars = 900 {"hint":"Max characters for voice status / welcome / questions (truncated before TTS)."}'
+    - '// @input float maxCategoryDetailSpeakChars = 2400 {"hint":"Max characters for category info-card TTS (longer than status lines)."}'
     - '// @input bool verboseLogs = true {"hint":"Log TTS lifecycle / errors."}'

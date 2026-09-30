@@ -30,6 +30,7 @@
     detailBodyText: false
     geminiAssistant: false
     packScanDetailText: false
+    packScanFullHudRoot: false
     packScanHud: false
     weatherAccuBridge: false
   ScriptTypesHidden:
@@ -47,6 +48,7 @@
       detailBodyText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       weatherAccuBridge: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       packScanHud: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      packScanFullHudRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       packScanDetailText: !<reference.Text> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
@@ -57,4 +59,5 @@
     - '// @input Component.Text detailBodyText {"hint":"Multi-line beta copy (repurposed PriceWatch_Text in template scene)."}'
     - '// @input AssignableType_1 weatherAccuBridge {"hint":"Optional: live AccuWeather strip for Weather category detail."}'
     - '// @input SceneObject packScanHud {"hint":"Optional: show a HUD object when Pack is opened (e.g. camera preview placeholder)."}'
+    - '// @input SceneObject packScanFullHudRoot {"hint":"Optional: **Pack-only** shell (e.g. a **Pack_HUD** object that does **not** contain `detailBodyText`). If this object is an ancestor of the category detail `Text` (e.g. **AI_UI_V2_Root**), it is **ignored** — wire a dedicated Pack parent instead."}'
     - '// @input Component.Text packScanDetailText {"hint":"Pack vision / status line (e.g. ScanDetail_Text_Body). Cleared when any category row opens so it does not overlap detailBodyText."}'

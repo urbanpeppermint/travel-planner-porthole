@@ -90,6 +90,10 @@ export interface CategoryOption {
   weatherPracticalTips?: string
   /** Pack card: hint for vision / checklist */
   luggageVisionHint?: string
+  /** Venue, hotel, station, or neighborhood a traveler would search on a map. */
+  placeName?: string
+  /** One-line way to reach `placeName` (walk, metro, taxi). Not turn-by-turn navigation. */
+  mapHint?: string
 }
 
 export interface CategoryCardData {

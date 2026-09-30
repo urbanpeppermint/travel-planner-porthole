@@ -31,7 +31,7 @@ Anti-tracking price search, real weather, packing AI, and multi-source compariso
 1. User speaks destination + dates → Gemini Live parses → `saveTripDetails()`
 2. RSG Imagen generates a destination scene → Spatial Image API spatializes it into AR "porthole window"
 3. Six category cards appear (Stay / Routes / Places / Food / Weather / Pack)
-4. Each category tap opens: anti-tracking WebView search, AccuWeather data, or camera packing analysis
+4. Each category tap opens: anti-tracking WebView search, AccuWeather data, or camera packing analysis *(planned — see TripOptic README **Roadmap**; not yet in `Assets/Scripts/TravelPlanner/`)*
 5. Inflation detector monitors search frequency; rotates UA automatically
 
 ---

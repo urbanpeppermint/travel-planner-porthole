@@ -2,6 +2,7 @@ import NativeLogger from 'SpectaclesInteractionKit.lspkg/Utils/NativeLogger'
 import { OpenAI } from 'RemoteServiceGateway.lspkg/HostedExternal/OpenAI'
 import { OpenAITypes } from 'RemoteServiceGateway.lspkg/HostedExternal/OpenAITypes'
 import { AIAssistantUIBridge } from './AIAssistantUIBridge'
+import { CategoryPlanDetailController } from './CategoryPlanDetailController'
 import { GeminiAssistant } from './GeminiAssistant'
 
 /**
@@ -9,6 +10,9 @@ import { GeminiAssistant } from './GeminiAssistant'
  * - **Keyboard**: speaks `AIAssistantUIBridge` keyboard step prompts (e.g. “Enter departure date…”).
  * - **Voice**: speaks `GeminiAssistant` status lines that guide missing fields / welcome
  *   (`onPromptGenerated`), while skipping noisy technical errors and long debug strings.
+ * - **Category row**: speaks the beta detail body when a planning category title is pinched
+ *   (`onCategoryDetailBody`). **`onBeforeCategoryDetailChange`** cancels any in-flight TTS when the user
+ *   opens another category, collapses the panel, or the plan refreshes.
  *
  * Requires **OpenAI** API token on `RemoteServiceGatewayCredentials` (same as ExampleOAICalls).
  * If TTS fails (no token, network), errors are logged only — text UI is unchanged.
@@ -31,6 +35,11 @@ export class AssistantTtsController extends BaseScriptComponent {
 
   @input
   @allowUndefined
+  @hint('When assigned, speaks category info-card copy after each category title pinch.')
+  categoryPlanDetailController: CategoryPlanDetailController
+
+  @input
+  @allowUndefined
   @hint('SceneObject that plays TTS (gets or creates AudioComponent). Defaults to this object.')
   audioOutputRoot: SceneObject
 
@@ -47,6 +56,10 @@ export class AssistantTtsController extends BaseScriptComponent {
   speakVoiceGuidance: boolean = true
 
   @input
+  @hint('Speak multi-line category detail when user opens a category row (info card).')
+  speakCategoryDetail: boolean = true
+
+  @input
   @hint('OpenAI speech model (e.g. tts-1, tts-1-hd, gpt-4o-mini-tts).')
   ttsModel: string = 'tts-1'
 
@@ -59,8 +72,12 @@ export class AssistantTtsController extends BaseScriptComponent {
   debounceSec: number = 0.45
 
   @input
-  @hint('Max characters sent to TTS (rest truncated).')
-  maxSpeakChars: number = 420
+  @hint('Max characters for voice status / welcome / questions (truncated before TTS).')
+  maxSpeakChars: number = 900
+
+  @input
+  @hint('Max characters for category info-card TTS (longer than status lines).')
+  maxCategoryDetailSpeakChars: number = 2400
 
   @input
   @hint('Log TTS lifecycle / errors.')
@@ -69,6 +86,8 @@ export class AssistantTtsController extends BaseScriptComponent {
   private readonly log = new NativeLogger('AssistantTtsController')
   private audioComponent: AudioComponent | null = null
   private debounceToken: number = 0
+  /** Bumped when cancelling so late OpenAI.speech callbacks do not play over a newer intent. */
+  private playbackGeneration: number = 0
   private pendingText: string = ''
 
   onAwake(): void {
@@ -95,6 +114,23 @@ export class AssistantTtsController extends BaseScriptComponent {
           this.queueSpeak(line)
         })
       }
+      if (this.categoryPlanDetailController) {
+        this.categoryPlanDetailController.onBeforeCategoryDetailChange.add(() => {
+          this.cancelAllSpeech()
+        })
+        if (this.speakCategoryDetail) {
+          this.categoryPlanDetailController.onCategoryDetailBody.add((body: string) => {
+            if (!this.enableTts || !this.speakCategoryDetail) {
+              return
+            }
+            if (!body || body.trim().length === 0) {
+              this.cancelAllSpeech()
+              return
+            }
+            this.queueSpeakCategoryBody(body)
+          })
+        }
+      }
       if (this.verboseLogs) {
         this.log.i(
           'AssistantTtsController: OpenAI token required on RemoteServiceGatewayCredentials for speech.',
@@ -103,15 +139,34 @@ export class AssistantTtsController extends BaseScriptComponent {
     })
   }
 
+  /** Stops playback, invalidates pending debounced TTS, and drops late OpenAI.speech responses. */
+  private cancelAllSpeech(): void {
+    this.playbackGeneration++
+    this.debounceToken++
+    this.pendingText = ''
+    this.stopPlaybackSafe()
+  }
+
+  private stopPlaybackSafe(): void {
+    try {
+      const ac = this.audioComponent
+      if (!ac) {
+        return
+      }
+      if (ac.isPlaying()) {
+        ac.stop(true)
+      }
+    } catch (e) {
+      this.log.e(`stopPlaybackSafe: ${e}`)
+    }
+  }
+
   /** Skip logs, raw errors, and very long status dumps — keep conversational guidance only. */
   private shouldSpeakVoiceLine(raw: string): boolean {
     if (!raw || raw.trim().length === 0) {
       return false
     }
     const t = raw.trim()
-    if (t.length > this.maxSpeakChars) {
-      return false
-    }
     const low = t.toLowerCase()
     if (low.indexOf('gemini.models failed') >= 0) {
       return false
@@ -128,11 +183,50 @@ export class AssistantTtsController extends BaseScriptComponent {
     return true
   }
 
+  private queueSpeakCategoryBody(raw: string): void {
+    this.cancelAllSpeech()
+    const cleaned = this.cleanCategoryBodyForSpeech(raw)
+    if (cleaned.length === 0) {
+      return
+    }
+    this.pendingText = cleaned
+    const token = ++this.debounceToken
+    const ev = this.createEvent('DelayedCallbackEvent')
+    ev.bind(() => {
+      if (token !== this.debounceToken) {
+        return
+      }
+      this.speakNow(this.pendingText)
+    })
+    ev.reset(this.debounceSec > 0.05 ? this.debounceSec : 0.45)
+  }
+
+  private cleanCategoryBodyForSpeech(raw: string): string {
+    let s = raw.replace(/https?:\/\/\S+/gi, ' ')
+    s = s.replace(/—+/g, ', ')
+    s = s.replace(/[›»]/g, ' ')
+    s = s.replace(/\s*•\s*/g, '. ')
+    s = s.replace(/\n+/g, '. ')
+    s = s.replace(/\s+/g, ' ').trim()
+    // Avoid TTS spelling "E-U-R"; speak amounts as "… euro" (after display normalization uses EUR).
+    s = s.replace(/\bEUR\s*(\d{1,6})\s*-\s*EUR\s*(\d{1,6})\b/gi, '$1 to $2 euro')
+    s = s.replace(/\bEUR(\d{1,6})\s*-\s*EUR(\d{1,6})\b/gi, '$1 to $2 euro')
+    s = s.replace(/\bEUR\s*(\d{1,6})\b/gi, '$1 euro')
+    s = s.replace(/\bEUR(\d{1,6})\b/gi, '$1 euro')
+    s = s.replace(/\u20ac\s*(\d{1,6})\b/g, '$1 euro')
+    const lim = Math.max(200, Math.floor(this.maxCategoryDetailSpeakChars))
+    if (s.length > lim) {
+      s = `${s.substring(0, lim - 1)}…`
+    }
+    return s
+  }
+
   private queueSpeak(raw: string): void {
     const cleaned = this.cleanForSpeech(raw)
     if (cleaned.length === 0) {
       return
     }
+    this.cancelAllSpeech()
     this.pendingText = cleaned
     const token = ++this.debounceToken
     const ev = this.createEvent('DelayedCallbackEvent')
@@ -157,6 +251,7 @@ export class AssistantTtsController extends BaseScriptComponent {
     if (!text || text.length === 0) {
       return
     }
+    const generation = this.playbackGeneration
     const req: OpenAITypes.Speech.Request = {
       model: this.ttsModel as OpenAITypes.Speech.Model,
       input: text,
@@ -165,7 +260,11 @@ export class AssistantTtsController extends BaseScriptComponent {
     }
     OpenAI.speech(req)
       .then((track: AudioTrackAsset) => {
+        if (generation !== this.playbackGeneration) {
+          return
+        }
         const ac = this.ensureAudioComponent()
+        this.stopPlaybackSafe()
         ac.audioTrack = track
         ac.play(1)
         if (this.verboseLogs) {

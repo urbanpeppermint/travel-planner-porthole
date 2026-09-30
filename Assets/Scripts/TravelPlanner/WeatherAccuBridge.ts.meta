@@ -53,4 +53,4 @@
     - '// @input Component.Text weatherSummaryText {"hint":"Text to update with current + short forecast summary."}'
     - '// @input string defaultLatitude = "52.5200" {"hint":"Default latitude when no device location (e.g. Berlin)."}'
     - '// @input string defaultLongitude = "13.4050" {"hint":"Default longitude when no device location."}'
-    - '// @input bool fetchOnStart = true {"hint":"Call AccuWeather on scene start."}'
+    - '// @input bool fetchOnStart {"hint":"Call AccuWeather on scene start. Leave off — TripOptic does not use the weather API."}'

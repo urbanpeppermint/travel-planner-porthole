@@ -128,6 +128,10 @@ export class DestinationVisualizer extends BaseScriptComponent {
     weatherCtx: string,
     onComplete: (textureBase64: string | null) => void,
   ): void {
+    if (!this.getSceneObject().enabled) {
+      onComplete(null)
+      return
+    }
     const prompt = this.buildImagePrompt(destination, occasion, weatherCtx)
     this.log.i(`Imagen.generateImage model=${this.imagenModel} dest=${destination}`)
 
@@ -180,6 +184,9 @@ export class DestinationVisualizer extends BaseScriptComponent {
   }
 
   private finishApplyPlanes(texture: Texture, destination: string): void {
+    if (!this.getSceneObject().enabled) {
+      return
+    }
     if (this.useSpatialImageFrame && this.spatialImageFrame) {
       const framed = this.spatialImageFrame as {
         setImage?: (a: Texture, b?: boolean) => void

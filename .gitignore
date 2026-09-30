@@ -20,3 +20,12 @@ Workspaces/**
 skills/
 skills-lock.json
 
+# Secrets — never commit API tokens or local IDE config
+.env
+.env.*
+.env.local
+*.pem
+credentials.json
+**/credentials.json
+.cursor/
+
